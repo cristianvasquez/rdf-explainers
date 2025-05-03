@@ -1,0 +1,23 @@
+{
+  "name": "rdf-explainers",
+  "version": "1.0.0",
+  "description": "",
+  "main": "vite.config.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cristianvasquez/rdf-explainers.git"
+  },
+  "private": true,
+  "devDependencies": {
+    "vite": "^6.3.4"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "^5.2.3",
+    "vite-plugin-node-polyfills": "^0.23.0",
+    "vue": "^3.5.13"
+  }
+}

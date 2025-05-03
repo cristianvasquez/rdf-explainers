@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>RDF explainers</title>
+</head>
+<body>
+<div id="app"></div>
+
+<script type="module">
+  import appModule from './src/app/main.js';
+
+  const model = {};
+  const el = document.getElementById('app');
+
+  const unmount = appModule.render({ model, el });
+
+  // You can call unmount() later if needed
+</script>
+</body>
+</html>
