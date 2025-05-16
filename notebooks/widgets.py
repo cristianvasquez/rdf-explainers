@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.12.10"
+__generated_with = "0.13.10"
 app = marimo.App(width="full")
 
 
@@ -14,8 +14,14 @@ def _():
 def _():
     import anywidget
     import traitlets
-    import pathlib
-    return anywidget, pathlib, traitlets
+    from pathlib import Path
+    return Path, anywidget, traitlets
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""# Simple counter widget""")
+    return
 
 
 @app.cell
@@ -65,7 +71,43 @@ def _(CounterWidget, mo):
 
     # # You can also access the widget's specific properties
     # widget.count
-    return (widgetCounter,)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(
+        r"""
+    ## Application made Vite + Vue.js outputs
+
+    The Vue.js application is built into a static distribution, that later on is later shown as Any-widget. 
+
+    The result is below.
+    """
+    )
+    return
+
+
+@app.cell
+def _(widget):
+    widget
+    return
+
+
+@app.cell
+def _(Path, Tmo):
+    Tmo.ui.file_browser(
+        initial_path=Path("src/app/"), multiple=True
+    )
+    return
+
+
+@app.cell
+def _(Path, mo):
+    mo.ui.file_browser(
+        initial_path=Path("hello_widget/"), multiple=True
+    )
+    return
 
 
 @app.cell
@@ -77,13 +119,7 @@ def _(anywidget, mo, traitlets):
       name = traitlets.Unicode().tag(sync=True)
 
     widget = mo.ui.anywidget(HelloWidget())
-    return HelloWidget, widget
-
-
-@app.cell
-def _(widget):
-    widget
-    return
+    return (widget,)
 
 
 if __name__ == "__main__":
