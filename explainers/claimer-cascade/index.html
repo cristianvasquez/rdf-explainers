@@ -1,0 +1,861 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="How rdf claim works: quads in a hose, three SHACL claimers own shapes of triples and borrow rdf:type, CONSTRUCT views project them onto a screen.">
+<title>Claimer Cascade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one wide instrument canvas, step narration and wire log under it. Single dark look by choice. */
+:root {
+  --bg: #0b1114;
+  --panel: #111a1f;
+  --panel-2: #16222a;
+  --line: #233139;
+  --fg: #e4ecef;
+  --muted: #8b9ea7;
+  --person: #ff8a6b;
+  --org: #5cc8ff;
+  --place: #f5c451;
+  --type: #c4b2ff;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--fg); }
+body { margin: 0; font: 15px/1.6 var(--body); padding-inline: 16px; padding-block: 0 64px; }
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 56px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 5.5vw, 3.8rem); line-height: 1.02; }
+h2 { font-size: clamp(1.6rem, 3.4vw, 2.2rem); line-height: 1.1; }
+h3 { font-size: 1.5rem; }
+p { margin: 0; max-width: 68ch; }
+code, pre, .mono { font-family: var(--mono); font-size: 0.86em; }
+code { color: var(--type); }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--org); outline-offset: 2px; }
+
+header.hero { padding-top: 48px; display: grid; gap: 18px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.hero h1 .p { color: var(--person); } .hero h1 .o { color: var(--org); } .hero h1 .l { color: var(--place); }
+.lede { font-size: 1.1rem; }
+.pipe { font-family: var(--mono); font-size: 13px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; white-space: pre; color: var(--muted); }
+.pipe b { font-weight: 600; }
+.c-person { color: var(--person); } .c-org { color: var(--org); } .c-place { color: var(--place); } .c-type { color: var(--type); } .c-muted { color: var(--muted); }
+
+.sec-head { display: grid; gap: 10px; }
+.stage { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.stage canvas { display: block; width: 100%; min-width: 760px; aspect-ratio: 1200 / 720; }
+
+.steps { display: flex; flex-wrap: wrap; gap: 6px; }
+.steps button { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px 6px 8px; cursor: pointer; display: inline-flex; gap: 8px; align-items: center; color: var(--muted); font-size: 14px; }
+.steps button .n { font: 600 11px/1 var(--mono); width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--panel-2); color: var(--muted); }
+.steps button[aria-selected="true"] { border-color: var(--fg); color: var(--fg); }
+.steps button[aria-selected="true"] .n { background: var(--fg); color: var(--bg); }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 14px; }
+.btn:hover { border-color: var(--muted); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
+.toolbar label { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); font-size: 13px; }
+.toolbar input[type=range] { width: 110px; accent-color: var(--org); }
+.spacer { flex: 1; }
+
+.below { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 860px) { .below { grid-template-columns: minmax(0, 1fr); } }
+.narr { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.narr .k { font: 600 12px/1 var(--mono); color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
+.narr .cli { font-family: var(--mono); font-size: 12.5px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.narr ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; max-width: 68ch; }
+
+.log { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; display: grid; gap: 8px; align-content: start; }
+.log h4, .panel h4 { margin: 0; font: 600 11px/1 var(--mono); color: var(--muted); letter-spacing: .12em; text-transform: uppercase; display: flex; justify-content: space-between; }
+.log ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font: 12px/1.45 var(--mono); min-height: 15em; }
+.log li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; animation: in .35s ease-out; }
+.log li .t { font-weight: 600; font-size: 10.5px; letter-spacing: .06em; padding-top: 1px; }
+.log li .q { overflow-wrap: anywhere; }
+.log li .g { color: var(--muted); }
+@keyframes in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+/* try-it controls inside the narration */
+.try { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 600px) { .try { grid-template-columns: minmax(0, 1fr); } }
+.panel { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.order { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.order li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto auto auto; gap: 8px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+.order li.off { opacity: .5; }
+.order .slot { font: 600 11px var(--mono); color: var(--muted); }
+.order .name { font: 500 13px var(--mono); }
+.order .mv { background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; width: 26px; height: 26px; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.order .mv:disabled { opacity: .3; cursor: default; }
+.order input { width: 16px; height: 16px; accent-color: var(--fg); }
+.json { font: 12px/1.5 var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px; white-space: pre; overflow-x: auto; margin: 0; }
+.err { color: var(--person); font: 12px var(--mono); min-height: 1.2em; }
+.tablewrap { overflow-x: auto; }
+table.res { border-collapse: collapse; width: 100%; font: 12.5px var(--mono); font-variant-numeric: tabular-nums; }
+table.res th, table.res td { text-align: right; padding: 5px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.res th:first-child, table.res td:first-child, table.res td:last-child, table.res th:last-child { text-align: left; }
+table.res th { color: var(--muted); font-weight: 400; font-size: 11px; }
+
+.laws { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.law { border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 6px; align-content: start; }
+.law .f { font: 600 14px var(--mono); }
+.law p { color: var(--muted); font-size: 14px; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); }
+.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 14px; cursor: pointer; color: var(--muted); font: 500 13px var(--mono); margin-bottom: -1px; }
+.tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--fg); }
+pre.doc { margin: 0; background: var(--panel); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 8px 8px; padding: 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.55; }
+pre.doc .cm { color: var(--muted); } pre.doc .kw { color: var(--type); } pre.doc .st { color: #a8d8b0; } pre.doc .gr { font-weight: 600; }
+
+.note { border-left: 2px solid var(--muted); padding-left: 14px; color: var(--muted); font-size: 14px; display: grid; gap: 6px; }
+footer { color: var(--muted); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .log li { animation: none; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">rdf-cli · rdf claim · @rdf-viz/claimer-runtime</div>
+  <h1>Claimers take shapes of data off the wire and <span class="p">dr</span><span class="o">a</span><span class="l">w</span> them.</h1>
+  <p class="lede">A claimer is one SHACL claim plus one or more CONSTRUCT views. The claim takes the triples its shapes read. The view projects them into new RDF for a viewer. Several claimers run as a Unix pipe, and the pipe order is the precedence.</p>
+  <div class="pipe">rdf read data.ttl \
+  | rdf claim <b class="c-person">person.trig</b> \
+  | rdf claim <b class="c-org">organization.trig</b> \
+  | rdf claim <b class="c-place">place.trig</b> \
+  | rdf pretty --format trig</div>
+</header>
+
+<section class="sec-head" aria-labelledby="ex-h">
+  <div class="eyebrow">Explainer · 7 steps</div>
+  <h2 id="ex-h">From one wire to a drawing</h2>
+  <div class="steps" role="tablist" id="steps"></div>
+  <div class="stage"><canvas id="cv" aria-label="Animation: quads flow through a hose, claimers take shapes of triples, views project them onto a screen"></canvas></div>
+  <div class="toolbar">
+    <button class="btn" id="prev">← Previous</button>
+    <button class="btn primary" id="next">Next step →</button>
+    <span class="spacer"></span>
+    <button class="btn" id="play">Pause</button>
+    <button class="btn" id="restart">Restart</button>
+    <button class="btn" id="skip">Jump to result</button>
+    <label for="speed">Speed <input type="range" id="speed" min="0.25" max="3" step="0.25" value="1"></label>
+  </div>
+  <div class="below">
+    <div class="narr" id="narr"></div>
+    <div class="log"><h4><span>Wire log</span><span id="log-n"></span></h4><ol id="log"></ol></div>
+  </div>
+</section>
+
+<section class="sec-head" aria-labelledby="laws-h">
+  <div class="eyebrow">What one claim guarantees</div>
+  <h2 id="laws-h">Four laws, no runtime checks</h2>
+  <div class="laws">
+    <div class="law"><div class="f">claimed ∪ rest = input</div><p>Partition. Every graphless quad is owned by this claimer or stays in the rest.</p></div>
+    <div class="law"><div class="f">claimed ∩ rest = ∅</div><p>Disjoint. An owned quad leaves graphless space. A later claimer cannot read it.</p></div>
+    <div class="law"><div class="f">frontier ⊆ rest</div><p>Borrowed quads feed the views and stay on the wire. Only a copy goes to the frontier graph.</p></div>
+    <div class="law"><div class="f">views commute</div><p>Every view of one claimer reads the same feed: source ∪ frontier. No view reads the output of another view.</p></div>
+  </div>
+</section>
+
+<section class="sec-head" aria-labelledby="docs-h">
+  <div class="eyebrow">Input of the animation</div>
+  <h2 id="docs-h">The data and the three claimer documents</h2>
+  <p class="c-muted">One TriG document defines one claimer: one named graph with the shapes and the views. The subject of <code>cascade:query</code> names the graph where the view output goes. The <code>viz:</code> drawing vocabulary is invented for this explainer.</p>
+  <div>
+    <div class="tabs" role="tablist" id="doc-tabs"></div>
+    <pre class="doc" id="doc-body"></pre>
+  </div>
+</section>
+
+<section class="note">
+  <div><b>Where the animation simplifies.</b></div>
+  <p>The hose moves quads one at a time. <code>rdf claim</code> does not decide per quad: it collects the graphless working set, runs the SHACL claim on the whole set, then splits it. The animation shows the result of that split, quad by quad.</p>
+  <p>On the real wire, owned quads and view output continue downstream as named quads, and later claimers pass them through untouched. The animation lifts them out of the hose to show the graph where each one lands.</p>
+  <p>The claim logic in this page is a small copy of the rules (owned = constraint paths of target nodes, frontier = <code>rdf:type</code> of <code>sh:targetClass</code>). It does not run SHACL validation, so <code>sh:minCount</code> has no effect here.</p>
+</section>
+
+<footer>Sources: <span class="mono">rdf-cli/spec/claim.md</span>, <span class="mono">spec/manifest.hs</span> (Claimers), <span class="mono">src/transforms/claim.js</span>, <span class="mono">src/transforms/claimer.js</span>, <span class="mono">rdf-viz/packages/lib/claimer-runtime</span>.</footer>
+</div>
+
+<script>
+(() => {
+'use strict';
+// ---------------------------------------------------------------- model
+const CLAIMERS = {
+  person: { id: 'person', label: 'Person', file: 'person.trig', target: 'Person', paths: ['name', 'worksAt'], need: ['name'], color: '#ff8a6b', shape: 'circle', viz: 'Circle', view: 'urn:views:person', graph: 'urn:claimers:person' },
+  org:    { id: 'org', label: 'Organization', file: 'organization.trig', target: 'Organization', paths: ['name', 'founded', 'locatedIn'], need: ['name', 'founded'], color: '#5cc8ff', shape: 'square', viz: 'Square', view: 'urn:views:organization', graph: 'urn:claimers:organization' },
+  place:  { id: 'place', label: 'Place', file: 'place.trig', target: 'Place', paths: ['name', 'lat'], need: ['name', 'lat'], color: '#f5c451', shape: 'triangle', viz: 'Triangle', view: 'urn:views:place', graph: 'urn:claimers:place' },
+};
+const ALL = ['person', 'org', 'place'];
+const LINK_P = new Set(['worksAt', 'locatedIn']);
+const NOISE_P = new Set(['favoriteColor', 'shoeSize', 'created']);
+// spawn order = array order
+const Q = [
+  ['ada', 'a', 'Person'], ['acme', 'a', 'Organization'], ['ada', 'name', '"Ada"'], ['doc', 'a', 'Document'],
+  ['berlin', 'a', 'Place'], ['acme', 'name', '"ACME"'], ['bob', 'a', 'Person'], ['ada', 'worksAt', 'acme'],
+  ['berlin', 'name', '"Berlin"'], ['acme', 'founded', '1998'], ['eve', 'a', 'Person'], ['bob', 'name', '"Bob"'],
+  ['ada', 'favoriteColor', '"teal"'], ['globex', 'a', 'Organization'], ['eve', 'a', 'Organization'], ['acme', 'locatedIn', 'berlin'],
+  ['eve', 'name', '"Eve"'], ['cyd', 'a', 'Person'], ['lima', 'a', 'Place'], ['bob', 'worksAt', 'globex'],
+  ['globex', 'name', '"Globex"'], ['eve', 'founded', '2021'], ['berlin', 'lat', '52.5'], ['cyd', 'name', '"Cyd"'],
+  ['doc', 'created', '"2026-10-02"'], ['globex', 'founded', '1989'], ['lima', 'name', '"Lima"'], ['globex', 'locatedIn', 'lima'],
+  ['bob', 'shoeSize', '44'], ['lima', 'lat', '-12.0'],
+].map(([s, p, o], i) => ({ i, s, p, o }));
+
+const P_CURIE = { a: 'rdf:type', name: 'ex:name', worksAt: 'ex:worksAt', locatedIn: 'ex:locatedIn', founded: 'ex:founded', lat: 'geo:lat', favoriteColor: 'ex:favoriteColor', shoeSize: 'ex:shoeSize', created: 'dct:created' };
+const oCurie = (q) => q.o.startsWith('"') || /^-?\d/.test(q.o) ? q.o : (q.o === 'Document' ? 'foaf:Document' : 'ex:' + q.o);
+const nq = (q) => `ex:${q.s} ${P_CURIE[q.p]} ${oCurie(q)}`;
+const short = (q) => `${q.s} ${q.p} ${q.o}`;
+const lit = (q) => q.o.replace(/"/g, '');
+
+// The cascade as a set computation, as in rdf-cli claim.js:
+// targets   = subjects of `?x rdf:type C` in the graphless rest (sh:targetClass)
+// owned     = quads of a target whose predicate is a constraint path
+// frontier  = the rdf:type quads target resolution read; copied, never removed
+function computeCascade (order, enabled) {
+  const fate = Q.map(() => ({ owner: null, borrowed: [] }));
+  let rest = Q.map((q) => q.i);
+  const per = {};
+  for (const id of order) {
+    if (!enabled.includes(id)) continue;
+    const c = CLAIMERS[id];
+    const typeQ = rest.filter((i) => Q[i].p === 'a' && Q[i].o === c.target);
+    const targets = typeQ.map((i) => Q[i].s);
+    const owned = rest.filter((i) => targets.includes(Q[i].s) && c.paths.includes(Q[i].p));
+    owned.forEach((i) => { fate[i].owner = id; });
+    typeQ.forEach((i) => fate[i].borrowed.push(id));
+    rest = rest.filter((i) => !owned.includes(i));
+    // one focus node = one shape instance: its borrowed type + its owned triples
+    const focus = targets.map((s) => {
+      const mine = owned.filter((i) => Q[i].s === s);
+      const by = (p) => mine.find((i) => Q[i].p === p);
+      const ok = c.need.every((p) => by(p) !== undefined);
+      const link = mine.find((i) => LINK_P.has(Q[i].p));
+      let label = '';
+      if (ok) label = id === 'org' ? `${lit(Q[by('name')])} · ${Q[by('founded')].o}` : id === 'place' ? `${lit(Q[by('name')])} ${Q[by('lat')].o}°` : lit(Q[by('name')]);
+      // projected triples: type + label (+ linksTo for person/org)
+      const out = ok ? 2 + (id !== 'place' && link !== undefined ? 1 : 0) : 0;
+      return { key: id + ':' + s, s, claimer: id, typeI: typeQ.find((i) => Q[i].s === s), owned: mine, need: c.need.map(by), ok, label, link, out };
+    });
+    per[id] = { owned, frontier: typeQ, focus, viewQuads: focus.reduce((n, f) => n + f.out, 0) };
+  }
+  const borrowedAll = new Set(Object.values(per).flatMap((r) => r.frontier));
+  const complement = rest.filter((i) => !borrowedAll.has(i));
+  return { fate, per, rest, complement };
+}
+
+// ---------------------------------------------------------------- geometry
+const W = 1200, H = 720;
+const HOSE_Y = 150, HOSE_R = 34, HOSE_X0 = 44, HOSE_END = 1000;
+const SLOT_X = [300, 560, 820];
+const TRAY = { y: 212, h: 132, w: 248 };
+const BIN = { x: 985, y: 222, w: 180, h: 150 };
+const SCREEN = { x: 40, y: 432, w: 1120, h: 270 };
+const ROW_Y = { circle: 486, square: 572, triangle: 654 };
+const ENT_X = { ada: 220, bob: 450, cyd: 680, eve: 960, acme: 330, globex: 620, berlin: 330, lima: 620 };
+const LANES = [-17, 0, 17];
+const SPEED = 150;
+const SPOKE = { owned: [-150, -90, -30], borrowed: 180, len: 21 };
+
+const COL = { panel: '#111a1f', line: '#233139', fg: '#e4ecef', muted: '#8b9ea7', type: '#c4b2ff', noise: '#7b8a92', dark: '#0b1114' };
+const MONO = '"JetBrains Mono", ui-monospace, monospace';
+const DISPLAY = '"Bricolage Grotesque", system-ui, sans-serif';
+
+const ease = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const backOut = (t) => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+const bez = (p, t) => { const u = 1 - t; return [u * u * p[0] + 2 * u * t * p[2] + t * t * p[4], u * u * p[1] + 2 * u * t * p[3] + t * t * p[5]]; };
+const rad = (d) => d * Math.PI / 180;
+function rr (ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+function hexA (hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
+const quadKind = (q) => q.p === 'a' ? 'type' : NOISE_P.has(q.p) ? 'noise' : 'data';
+
+// ---------------------------------------------------------------- simulation
+class Sim {
+  constructor (canvas, { onLog }) {
+    this.cv = canvas; this.ctx = canvas.getContext('2d'); this.onLog = onLog;
+    this.speed = 1; this.playing = true; this.visible = true; this.widths = new Map();
+    this.opts = { order: [], enabled: [], views: true, highlight: null };
+    new ResizeObserver(() => this.resize()).observe(canvas);
+    new IntersectionObserver((e) => { this.visible = e[0].isIntersecting; }).observe(canvas);
+    this.resize(); this.reset();
+  }
+  resize () {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2), w = this.cv.clientWidth || 1200;
+    this.cv.width = Math.round(w * dpr); this.cv.height = Math.round(w * H / W * dpr);
+    this.scale = this.cv.width / W;
+  }
+  configure (opts) { this.opts = { views: true, highlight: null, ...opts }; this.reset(); }
+  reset () {
+    const { order, enabled } = this.opts;
+    this.result = computeCascade(order, enabled);
+    this.stations = order.map((id, k) => {
+      const st = { id, c: CLAIMERS[id], x: SLOT_X[k], enabled: enabled.includes(id), hubs: new Map(), flash: 0, own: 0, borrow: 0, view: 0 };
+      if (st.enabled) this.result.per[id].focus.forEach((f, n) => st.hubs.set(f.s, { f, n, have: new Set(), seen: false, emitted: false, pulse: 0 }));
+      return st;
+    });
+    this.time = 0; this.next = 0; this.parts = []; this.orbs = []; this.bin = []; this.binReserved = 0;
+    this.nodes = new Map(); this.edges = []; this.doneAt = null; this.logN = 0;
+    this.onLog(null);
+  }
+  log (tag, text, graph, color) { this.logN++; this.onLog({ tag, text, graph, color, n: this.logN }); }
+  hubPos (st, n) { return [st.x - TRAY.w / 2 + 30 + (n % 2) * 122, TRAY.y + 44 + Math.floor(n / 2) * 54]; }
+  spokeEnd (st, hub, q) {
+    const [hx, hy] = this.hubPos(st, hub.n);
+    const a = q.p === 'a' ? SPOKE.borrowed : SPOKE.owned[st.c.paths.indexOf(q.p)];
+    return [hx + Math.cos(rad(a)) * SPOKE.len, hy + Math.sin(rad(a)) * SPOKE.len];
+  }
+  binSlot (n) { return [BIN.x + 14 + (n % 6) * 26 + 11, BIN.y + BIN.h - 12 - Math.floor(n / 6) * 13]; }
+
+  update (dt) {
+    dt *= this.speed; this.time += dt;
+    while (this.next < Q.length && this.time >= 0.2 + this.next * 0.42) {
+      this.parts.push({ q: Q[this.next], x: HOSE_X0 + 20, lane: LANES[this.next % 3], state: 'hose', born: this.time });
+      this.next++;
+    }
+    for (const st of this.stations) { st.flash = Math.max(0, st.flash - dt * 2.2); for (const h of st.hubs.values()) h.pulse = Math.max(0, h.pulse - dt * 1.5); }
+    const keep = [];
+    for (const p of this.parts) {
+      if (p.state === 'hose') {
+        const px = p.x; p.x += SPEED * dt;
+        let left = false;
+        for (const st of this.stations) {
+          if (!st.enabled || !(px < st.x && p.x >= st.x)) continue;
+          const f = this.result.fate[p.q.i], hub = st.hubs.get(p.q.s);
+          if (f.owner === st.id) {
+            const [ex, ey] = this.spokeEnd(st, hub, p.q);
+            Object.assign(p, { state: 'drop', st, hub, t: 0, dur: 0.8, path: [st.x, HOSE_Y + p.lane, st.x, HOSE_Y + 60, ex, ey], which: 'own' });
+            st.flash = 1; left = true; break;
+          }
+          if (f.borrowed.includes(st.id)) {
+            const [ex, ey] = this.spokeEnd(st, hub, p.q);
+            keep.push({ q: p.q, state: 'drop', st, hub, t: 0, dur: 0.8, path: [st.x, HOSE_Y + p.lane, st.x - 10, HOSE_Y + 60, ex, ey], which: 'borrow' });
+            (p.marks ||= []).push(st.c.color);
+            st.flash = Math.max(st.flash, 0.6);
+          }
+        }
+        if (!left && p.x >= HOSE_END) {
+          const [bx, by] = this.binSlot(this.binReserved++);
+          Object.assign(p, { state: 'fall', t: 0, dur: 0.8, path: [p.x, HOSE_Y + p.lane, bx - 10, HOSE_Y + 20, bx, by] });
+        }
+        keep.push(p);
+      } else {
+        p.t += dt / p.dur;
+        if (p.t >= 1) this.arrive(p); else keep.push(p);
+      }
+    }
+    this.parts = keep;
+    this.orbs = this.orbs.filter((o) => { o.t += dt / o.dur; if (o.t >= 1) { this.land(o); return false; } return true; });
+    this.checkEdges();
+    if (this.next >= Q.length && !this.parts.length && !this.orbs.length) {
+      if (this.doneAt === null) this.doneAt = this.time;
+      if (this.time - this.doneAt > 6) this.reset();
+    }
+  }
+  arrive (p) {
+    const q = p.q;
+    if (p.state === 'fall') {
+      this.bin.push(q);
+      const b = this.result.fate[q.i].borrowed.length;
+      this.log('REST', nq(q) + ' .', b ? 'graphless · was borrowed' : 'graphless · no claimer', b ? COL.type : COL.noise);
+      return;
+    }
+    const { st, hub } = p;
+    hub.have.add(q.i); hub.seen = true; hub.pulse = 0.6;
+    if (p.which === 'own') { st.own++; this.log('OWN', nq(q), `<${st.c.graph}:source>`, st.c.color); }
+    else { st.borrow++; this.log('BORROW', nq(q), `copy → <${st.c.graph}:frontier> · original stays`, COL.type); }
+    this.fireView(st, hub);
+  }
+  fireView (st, hub) {
+    const f = hub.f;
+    if (!this.opts.views || hub.emitted || !f.ok) return;
+    if (!hub.have.has(f.typeI) || !f.need.every((i) => hub.have.has(i))) return;
+    hub.emitted = true; hub.pulse = 1;
+    const [hx, hy] = this.hubPos(st, hub.n), tx = ENT_X[f.s], ty = ROW_Y[st.c.shape];
+    this.orbs.push({ f, st, t: 0, dur: 1.0, path: [hx, hy, (hx + tx) / 2, 400, tx, ty] });
+  }
+  land (o) {
+    const { f, st } = o;
+    this.nodes.set(f.key, { f, s: f.s, shape: st.c.shape, color: st.c.color, x: ENT_X[f.s], y: ROW_Y[st.c.shape], born: this.time, label: f.label });
+    st.view += 2;
+    this.log('VIEW', `ex:${f.s} a viz:${st.c.viz} ; viz:label "${f.label}"`, `<${st.c.view}>`, st.c.color);
+  }
+  checkEdges () {
+    if (!this.opts.views) return;
+    for (const st of this.stations) {
+      if (!st.enabled || st.id === 'place') continue;
+      for (const hub of st.hubs.values()) {
+        const f = hub.f;
+        if (f.link === undefined || !hub.have.has(f.link) || this.edges.some((e) => e.i === f.link)) continue;
+        const a = this.nodes.get(f.key), to = Q[f.link].o;
+        const b = [...this.nodes.values()].find((n) => n.s === to);
+        if (!a || !b) continue;
+        this.edges.push({ i: f.link, a, b, color: st.c.color, born: this.time });
+        st.view++;
+        this.log('VIEW', `ex:${f.s} viz:linksTo ex:${to}`, `<${st.c.view}>`, st.c.color);
+      }
+    }
+  }
+  fastForward (sec) { for (let t = 0; t < sec && !(this.doneAt !== null && this.time - this.doneAt > 1); t += 1 / 30) this.update(1 / 30 / this.speed); }
+
+  // ------------------------------------------------------------ drawing
+  dimQ (q) { const h = this.opts.highlight; return h && h.quad ? !h.quad(q, this.result) : false; }
+  dimS (s) { const h = this.opts.highlight; return h && h.s ? !h.s(s) : false; }
+  textW (s, font) { const k = font + s; if (!this.widths.has(k)) { this.ctx.font = font; this.widths.set(k, this.ctx.measureText(s).width); } return this.widths.get(k); }
+
+  capsule (x, y, q, opt = {}) {
+    const ctx = this.ctx, font = `500 10.5px ${MONO}`, txt = short(q), w = this.textW(txt, font) + 16, h = 15, kind = quadKind(q);
+    ctx.save(); ctx.globalAlpha = opt.alpha ?? 1;
+    rr(ctx, x - w / 2, y - h / 2, w, h, 7.5);
+    if (opt.claim) { ctx.fillStyle = opt.claim; ctx.shadowColor = opt.claim; ctx.shadowBlur = 14; ctx.fill(); ctx.shadowBlur = 0; }
+    else if (kind === 'type') { ctx.fillStyle = 'rgba(196,178,255,0.10)'; ctx.fill(); ctx.strokeStyle = COL.type; ctx.lineWidth = 1; if (opt.copy) ctx.setLineDash([3, 2]); ctx.stroke(); ctx.setLineDash([]); }
+    else { ctx.fillStyle = kind === 'noise' ? '#161f24' : '#1c2a32'; ctx.fill(); ctx.strokeStyle = kind === 'noise' ? '#2c3a41' : '#3d525d'; ctx.lineWidth = 1; ctx.stroke(); }
+    ctx.fillStyle = opt.claim ? COL.dark : kind === 'type' ? COL.type : kind === 'noise' ? COL.noise : COL.fg;
+    ctx.font = font; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, x, y + 0.5);
+    if (opt.marks) opt.marks.forEach((c, k) => { ctx.beginPath(); ctx.arc(x - w / 2 - 5 - k * 7, y, 2.6, 0, 7); ctx.fillStyle = c; ctx.fill(); });
+    ctx.restore();
+  }
+
+  draw () {
+    const ctx = this.ctx, T = this.time;
+    ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = COL.panel; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(228,236,239,0.045)';
+    for (let x = 12; x < W; x += 24) for (let y = 12; y < H; y += 24) ctx.fillRect(x, y, 1.4, 1.4);
+    this.drawSource(); this.drawScreen(); this.drawBin();
+    for (const st of this.stations) this.drawStationBody(st);
+    this.drawHose();
+    for (const st of this.stations) this.drawStationHead(st);
+    for (const p of this.parts) {
+      const a = this.dimQ(p.q) ? 0.16 : 1;
+      if (p.state === 'hose') {
+        const wob = Math.sin((T - p.born) * 3 + p.q.i) * 1.5;
+        this.capsule(p.x, HOSE_Y + p.lane + wob, p.q, { alpha: a * Math.max(0, Math.min(1, (p.x - HOSE_X0 - 40) / 60)), marks: p.marks });
+      } else {
+        const [x, y] = bez(p.path, ease(Math.min(1, p.t)));
+        if (p.state === 'fall') this.capsule(x, y, p.q, { alpha: a, marks: p.marks });
+        else if (p.which === 'own') this.capsule(x, y, p.q, { claim: p.st.c.color, alpha: a });
+        else this.capsule(x, y, p.q, { copy: true, alpha: a });
+      }
+    }
+    for (const o of this.orbs) {
+      const t = ease(o.t), [x, y] = bez(o.path, t), a = this.dimS(o.f.s) ? 0.2 : 1;
+      ctx.save(); ctx.globalAlpha = a;
+      for (let k = 1; k <= 6; k++) { const [tx, ty] = bez(o.path, Math.max(0, t - k * 0.025)); ctx.beginPath(); ctx.arc(tx, ty, 5 - k * 0.6, 0, 7); ctx.fillStyle = hexA(o.st.c.color, 0.35 - k * 0.05); ctx.fill(); }
+      ctx.shadowColor = o.st.c.color; ctx.shadowBlur = 18; ctx.beginPath(); ctx.arc(x, y, 5.5, 0, 7); ctx.fillStyle = o.st.c.color; ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  drawSource () {
+    const ctx = this.ctx;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = COL.fg; ctx.font = `600 12px ${MONO}`; ctx.fillText('rdf read data.ttl', 24, 62);
+    ctx.fillStyle = COL.muted; ctx.font = `400 11px ${MONO}`;
+    ctx.fillText('skolemize · drop graphs', 24, 80);
+    ctx.fillText(`${Q.length} quads, all graphless`, 24, 96);
+  }
+
+  drawHose () {
+    const ctx = this.ctx, y0 = HOSE_Y - HOSE_R, h = HOSE_R * 2, x0 = HOSE_X0 - 20, x1 = HOSE_END + 28;
+    const g = ctx.createLinearGradient(0, y0, 0, y0 + h);
+    g.addColorStop(0, 'rgba(160,200,215,0.16)'); g.addColorStop(0.5, 'rgba(160,200,215,0.04)'); g.addColorStop(1, 'rgba(160,200,215,0.12)');
+    rr(ctx, x0, y0, x1 - x0, h, HOSE_R); ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(180,215,228,0.28)'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x0 + 30, y0 + 6); ctx.lineTo(x1 - 30, y0 + 6); ctx.stroke();
+    ctx.fillStyle = 'rgba(180,215,228,0.10)';
+    const off = (this.time * SPEED * 0.6) % 40;
+    for (let x = x0 + 24 + off; x < x1 - 20; x += 40) { ctx.beginPath(); ctx.moveTo(x, HOSE_Y - 5); ctx.lineTo(x + 5, HOSE_Y); ctx.lineTo(x, HOSE_Y + 5); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle = COL.muted; ctx.font = `400 11px ${MONO}`; ctx.textAlign = 'right';
+    ctx.fillText('graphless rest →', HOSE_END + 26, y0 - 10);
+  }
+
+  drawStationHead (st) {
+    const ctx = this.ctx, c = st.c;
+    ctx.save(); ctx.globalAlpha = st.enabled ? 1 : 0.35;
+    ctx.shadowColor = c.color; ctx.shadowBlur = 8 + st.flash * 26;
+    rr(ctx, st.x - 9, HOSE_Y - HOSE_R - 6, 18, HOSE_R * 2 + 12, 6);
+    ctx.fillStyle = hexA(c.color, 0.18 + st.flash * 0.35); ctx.fill();
+    ctx.strokeStyle = c.color; ctx.lineWidth = 1.6; ctx.stroke();
+    ctx.shadowBlur = 0;
+    const cx = st.x - 118, cy = 16, cw = 236, ch = 78;
+    rr(ctx, cx, cy, cw, ch, 8); ctx.fillStyle = 'rgba(11,17,20,0.88)'; ctx.fill(); ctx.strokeStyle = hexA(c.color, 0.55); ctx.lineWidth = 1; ctx.stroke();
+    this.glyph(c.shape, cx + 20, cy + 23, 8, c.color);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = c.color; ctx.font = `600 12px ${MONO}`; ctx.fillText('rdf claim ' + c.file, cx + 36, cy + 27);
+    ctx.fillStyle = COL.type; ctx.font = `400 10.5px ${MONO}`; ctx.fillText('targetClass ex:' + c.target + '  (borrow)', cx + 12, cy + 49);
+    ctx.fillStyle = COL.fg; ctx.fillText(`path ${c.paths.join(', ')}  (own ${c.paths.length})`, cx + 12, cy + 66);
+    if (!st.enabled) { ctx.font = `600 10px ${MONO}`; ctx.textAlign = 'right'; ctx.fillText('DISABLED', cx + cw - 10, cy + 27); }
+    ctx.strokeStyle = hexA(c.color, 0.5); ctx.beginPath(); ctx.moveTo(st.x, cy + ch); ctx.lineTo(st.x, HOSE_Y - HOSE_R - 6); ctx.stroke();
+    ctx.restore();
+  }
+
+  drawStationBody (st) {
+    const ctx = this.ctx, c = st.c, views = this.opts.views;
+    const base = st.enabled ? 1 : 0.3;
+    ctx.save(); ctx.globalAlpha = base;
+    const tx = st.x - TRAY.w / 2;
+    ctx.strokeStyle = hexA(c.color, 0.35); ctx.lineWidth = 6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(st.x, HOSE_Y + HOSE_R); ctx.lineTo(st.x, TRAY.y); ctx.stroke();
+    rr(ctx, tx, TRAY.y, TRAY.w, TRAY.h, 8);
+    ctx.fillStyle = 'rgba(11,17,20,0.75)'; ctx.fill(); ctx.strokeStyle = hexA(c.color, 0.45); ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = COL.muted; ctx.font = `400 9.5px ${MONO}`; ctx.textAlign = 'left';
+    ctx.fillText('claimed shapes', tx + 8, TRAY.y + 13);
+    // hubs: one focus node each. Solid spokes = owned, dashed = borrowed.
+    for (const hub of st.hubs.values()) {
+      if (!hub.seen) continue;
+      const [hx, hy] = this.hubPos(st, hub.n), f = hub.f;
+      ctx.globalAlpha = base * (this.dimS(f.s) ? 0.2 : 1);
+      for (const i of hub.have) {
+        const [ex, ey] = this.spokeEnd(st, hub, Q[i]), b = Q[i].p === 'a';
+        ctx.strokeStyle = b ? COL.type : c.color; ctx.lineWidth = 1.4; if (b) ctx.setLineDash([3, 2]);
+        ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(ex, ey, 3.6, 0, 7);
+        if (b) { ctx.fillStyle = COL.dark; ctx.fill(); ctx.strokeStyle = COL.type; ctx.stroke(); } else { ctx.fillStyle = c.color; ctx.fill(); }
+      }
+      ctx.save(); if (hub.pulse) { ctx.shadowColor = c.color; ctx.shadowBlur = 20 * hub.pulse; }
+      ctx.beginPath(); ctx.arc(hx, hy, 5, 0, 7); ctx.fillStyle = hub.emitted ? c.color : COL.fg; ctx.fill(); ctx.restore();
+      ctx.fillStyle = COL.fg; ctx.font = `500 10.5px ${MONO}`; ctx.textAlign = 'left';
+      ctx.fillText(f.s, hx + 10, hy + 1);
+      const nOwn = [...hub.have].filter((i) => Q[i].p !== 'a').length, nB = hub.have.size - nOwn;
+      ctx.fillStyle = COL.muted; ctx.font = `400 9.5px ${MONO}`;
+      ctx.fillText(`●${nOwn} own ○${nB}`, hx + 10, hy + 14);
+      if (hub.emitted) { ctx.fillStyle = c.color; ctx.fillText(`→ ${f.out} out`, hx + 10, hy + 26); }
+      else if (hub.have.has(f.typeI) && !f.ok && views) { ctx.fillStyle = COL.muted; ctx.fillText('→ no match', hx + 10, hy + 26); }
+    }
+    ctx.globalAlpha = base;
+    ctx.save(); ctx.globalAlpha = base * (views ? 1 : 0.3);
+    ctx.beginPath(); ctx.moveTo(st.x, 352); ctx.lineTo(st.x + 16, 380); ctx.lineTo(st.x - 16, 380); ctx.closePath();
+    const pg = ctx.createLinearGradient(st.x - 16, 352, st.x + 16, 380);
+    pg.addColorStop(0, hexA(c.color, 0.9)); pg.addColorStop(1, hexA(c.color, 0.25));
+    ctx.fillStyle = pg; ctx.shadowColor = c.color; ctx.shadowBlur = views ? 10 + st.flash * 10 : 0; ctx.fill(); ctx.shadowBlur = 0;
+    ctx.fillStyle = COL.fg; ctx.font = `600 10px ${MONO}`; ctx.textAlign = 'left';
+    ctx.fillText('CONSTRUCT', st.x + 22, 372);
+    ctx.fillStyle = COL.muted; ctx.font = `400 10px ${MONO}`; ctx.textAlign = 'center';
+    ctx.fillText(views ? '→ <' + c.view + '>' : 'view not shown in this step', st.x, 397);
+    ctx.restore();
+    ctx.fillStyle = COL.muted; ctx.font = `400 10.5px ${MONO}`; ctx.textAlign = 'center';
+    ctx.fillText(`own ${st.own} · borrow ${st.borrow} · view ${st.view}`, st.x, 414);
+    ctx.restore();
+  }
+
+  drawBin () {
+    const ctx = this.ctx, b = BIN;
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x, b.y + b.h - 8); ctx.quadraticCurveTo(b.x, b.y + b.h, b.x + 8, b.y + b.h);
+    ctx.lineTo(b.x + b.w - 8, b.y + b.h); ctx.quadraticCurveTo(b.x + b.w, b.y + b.h, b.x + b.w, b.y + b.h - 8); ctx.lineTo(b.x + b.w, b.y);
+    ctx.strokeStyle = 'rgba(180,215,228,0.35)'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = 'rgba(11,17,20,0.5)'; ctx.fill();
+    this.bin.forEach((q, n) => {
+      const [x, y] = this.binSlot(n), borrowed = this.result.fate[q.i].borrowed.length > 0;
+      ctx.globalAlpha = this.dimQ(q) ? 0.18 : 1;
+      rr(ctx, x - 11, y - 4.5, 22, 9, 3);
+      if (borrowed) { ctx.strokeStyle = COL.type; ctx.setLineDash([2, 2]); ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]); }
+      else { ctx.fillStyle = quadKind(q) === 'type' ? COL.type : COL.fg; ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 6; ctx.fill(); ctx.shadowBlur = 0; }
+      ctx.globalAlpha = 1;
+    });
+    const comp = this.bin.filter((q) => !this.result.fate[q.i].borrowed.length).length;
+    ctx.fillStyle = COL.fg; ctx.font = `600 11px ${MONO}`; ctx.textAlign = 'left';
+    ctx.fillText(`rest · ${this.bin.length} graphless`, b.x + 8, b.y + 18);
+    ctx.fillStyle = COL.muted; ctx.font = `400 10px ${MONO}`;
+    ctx.fillText(`complement ${comp} · borrowed ${this.bin.length - comp}`, b.x + 8, b.y + 33);
+    ctx.restore();
+  }
+
+  drawScreen () {
+    const ctx = this.ctx, S = SCREEN, T = this.time;
+    ctx.save();
+    rr(ctx, S.x, S.y, S.w, S.h, 12);
+    const g = ctx.createLinearGradient(0, S.y, 0, S.y + S.h); g.addColorStop(0, '#0e171c'); g.addColorStop(1, '#0a1013');
+    ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = COL.line; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.clip();
+    ctx.fillStyle = 'rgba(255,255,255,0.018)';
+    for (let y = S.y; y < S.y + S.h; y += 4) ctx.fillRect(S.x, y, S.w, 1);
+    ctx.restore();
+    ctx.fillStyle = COL.muted; ctx.font = `600 10.5px ${MONO}`; ctx.textAlign = 'left';
+    ctx.fillText('VIEWER · draws only the view graphs', S.x + 14, S.y + 20);
+    let lx = S.x + S.w - 14; ctx.textAlign = 'right'; ctx.font = `400 10.5px ${MONO}`;
+    for (const id of ['place', 'org', 'person']) {
+      const c = CLAIMERS[id], t = '<' + c.view + '>';
+      ctx.fillStyle = COL.muted; ctx.fillText(t, lx, S.y + 20);
+      lx -= this.textW(t, `400 10.5px ${MONO}`) + 8; this.glyph(c.shape, lx - 4, S.y + 16, 4.5, c.color); lx -= 22;
+    }
+    for (const e of this.edges) {
+      const k = Math.min(1, (T - e.born) / 0.6), a = this.dimS(e.a.s) && this.dimS(e.b.s) ? 0.15 : 0.85;
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.strokeStyle = e.color; ctx.lineWidth = 1.6; ctx.setLineDash([6, 5]); ctx.lineDashOffset = -T * 20;
+      const y1 = e.a.y + 15, y2 = e.b.y - 15;
+      ctx.beginPath(); ctx.moveTo(e.a.x, y1); ctx.lineTo(e.a.x + (e.b.x - e.a.x) * k, y1 + (y2 - y1) * k); ctx.stroke();
+      ctx.restore();
+    }
+    for (const n of this.nodes.values()) {
+      const k = Math.min(1, (T - n.born) / 0.55), a = this.dimS(n.s) ? 0.2 : 1;
+      this.glyph(n.shape, n.x, n.y, 14 * backOut(k), n.color, a, true);
+      ctx.save(); ctx.globalAlpha = a * k;
+      ctx.fillStyle = COL.fg; ctx.font = `500 13px ${DISPLAY}`; ctx.textAlign = 'left';
+      ctx.fillText(n.label, n.x + 22, n.y + 4);
+      ctx.fillStyle = COL.muted; ctx.font = `400 10px ${MONO}`;
+      ctx.fillText(`${n.f.owned.length} own + 1 borrow → ${n.f.out} out`, n.x + 22, n.y + 18);
+      ctx.restore();
+    }
+    if (!this.opts.views || !this.stations.some((st) => st.enabled)) {
+      ctx.fillStyle = COL.muted; ctx.font = `400 13px ${DISPLAY}`; ctx.textAlign = 'center';
+      ctx.fillText(this.stations.length ? 'No view runs in this step. The screen stays empty.' : 'No claimer, so no view graph. The screen stays empty.', S.x + S.w / 2, S.y + S.h / 2 + 6);
+    }
+  }
+
+  glyph (shape, x, y, r, color, alpha = 1, glow = false) {
+    const ctx = this.ctx; if (r <= 0.5) return;
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    if (shape === 'circle') ctx.arc(x, y, r, 0, Math.PI * 2);
+    else if (shape === 'square') ctx.roundRect(x - r * 0.9, y - r * 0.9, r * 1.8, r * 1.8, r * 0.25);
+    else { ctx.moveTo(x, y - r * 1.05); ctx.lineTo(x + r, y + r * 0.75); ctx.lineTo(x - r, y + r * 0.75); ctx.closePath(); }
+    if (glow) {
+      ctx.shadowColor = color; ctx.shadowBlur = 20;
+      const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.4, 1, x, y, r * 1.3);
+      g.addColorStop(0, '#ffffff'); g.addColorStop(0.25, color); g.addColorStop(1, hexA(color, 0.75));
+      ctx.fillStyle = g;
+    } else ctx.fillStyle = color;
+    ctx.fill(); ctx.restore();
+  }
+}
+
+// ---------------------------------------------------------------- page
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const logOl = $('log'), logN = $('log-n');
+const sim = new Sim($('cv'), {
+  onLog (e) {
+    if (!e) { logOl.innerHTML = ''; logN.textContent = ''; return; }
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="t" style="color:${e.color}">${e.tag}</span><span class="q">${esc(e.text)} <span class="g">${esc(e.graph)}</span></span>`;
+    logOl.prepend(li);
+    while (logOl.children.length > 10) logOl.lastChild.remove();
+    logN.textContent = e.n + ' events';
+  },
+});
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let evePersonFirst = true;
+const conf = { order: [...ALL], enabled: [...ALL] };
+
+const STEPS = [
+  {
+    title: 'The wire', k: 'Input',
+    cfg: () => ({ order: [], enabled: [] }),
+    html: () => `<p><code>prepareClaimerInput</code> skolemizes blank nodes and drops every graph name. All quads on the wire are now <b>graphless</b>. Only graphless quads are claimable.</p>
+<p>With no claimer in the pipe, every quad goes through the hose into the rest. Lilac capsules are <code>rdf:type</code> quads. Grey capsules are quads that no claimer will ask for.</p>`,
+    cli: () => 'rdf read data.ttl | rdf pretty',
+  },
+  {
+    title: 'Own and borrow', k: 'One claimer, claim only',
+    cfg: () => ({ order: ['person'], enabled: ['person'], views: false }),
+    html: () => `<p>The Person shape has a target and two constraint paths. Each target node becomes one <b>shape instance</b> in the tray: a hub with its triples as spokes.</p>
+<ul>
+<li><b class="c-person">Owned (solid spoke):</b> the triples a constraint reads, here <code>ex:name</code> and <code>ex:worksAt</code>, so 2 per person. They leave the wire and go to <code>&lt;urn:claimers:person:source&gt;</code>.</li>
+<li><b class="c-type">Borrowed (dashed spoke):</b> the <code>rdf:type ex:Person</code> triple that target resolution reads. The view gets it, but the claimer does <b>not</b> take it. The original stays on the wire (coloured dot on the capsule). Only a provenance copy goes to <code>…:frontier</code>.</li>
+</ul>
+<p>Why borrow and not own? The view needs the type to know what to draw, and later claimers need the same type to find their own targets. If the first claimer took <code>rdf:type</code>, Eve could not be found as an Organization in step 5. A shape that wants to own its type says so with <code>[ sh:path rdf:type ]</code>.</p>`,
+    cli: () => 'rdf read data.ttl \\\n  | rdf claim person.trig',
+  },
+  {
+    title: 'A view', k: 'Projection, not a copy',
+    cfg: () => ({ order: ['person'], enabled: ['person'] }),
+    html: () => `<p>A view is a CONSTRUCT. Its input is <b>source ∪ frontier</b> of its own claimer only. When a shape instance has what the WHERE needs, the view projects it to <code>&lt;urn:views:person&gt;</code> and the viewer draws it.</p>
+<p>The projection is a new shape. Its triple count does not have to match the claim: Ada comes in as 2 owned + 1 borrowed and goes out as 3 (<code>a viz:Circle</code>, <code>viz:label</code>, <code>viz:linksTo</code>). Cyd has no <code>ex:worksAt</code>, so 1 + 1 → 2. The edges to ACME and Globex wait: no claimer drew those nodes yet.</p>`,
+    cli: () => `CONSTRUCT { ?p a viz:Circle ; viz:label ?n ; viz:linksTo ?o }
+WHERE {
+  ?p a ex:Person ;            # borrowed (frontier)
+     ex:name ?n .             # owned (source)
+  OPTIONAL { ?p ex:worksAt ?o }
+}`,
+  },
+  {
+    title: 'The cascade', k: 'Three claimers in a pipe',
+    cfg: () => ({ order: [...ALL], enabled: [...ALL] }),
+    html: () => `<p>Three claimers are three <code>rdf claim</code> processes in one pipe. Each one reads only the graphless rest of the process before it. There is no order field in any document: the pipe order is the precedence.</p>
+<p>The shapes have different sizes. <span class="c-person">Person</span> owns 2 triples per node, <span class="c-org">Organization</span> owns 3 (<code>name</code>, <code>founded</code>, <code>locatedIn</code>), <span class="c-place">Place</span> owns 2 (<code>name</code>, <code>lat</code>). The projections differ again: Organization folds <code>name</code> + <code>founded</code> into one label (3 + 1 → 3), Place folds <code>name</code> + <code>lat</code> (2 + 1 → 2).</p>`,
+    cli: () => 'rdf read data.ttl \\\n  | rdf claim person.trig \\\n  | rdf claim organization.trig \\\n  | rdf claim place.trig \\\n  | rdf pretty --format trig',
+  },
+  {
+    title: 'Precedence', k: 'Two shapes want one triple',
+    cfg: () => ({ order: evePersonFirst ? ['person', 'org', 'place'] : ['org', 'person', 'place'], enabled: [...ALL], highlight: { quad: (q) => q.s === 'eve', s: (s) => s === 'eve' } }),
+    html: () => `<p><code>ex:eve</code> is typed <code>ex:Person</code> and <code>ex:Organization</code>. Both shapes read <code>ex:eve ex:name "Eve"</code>. Only Eve's quads are bright.</p>
+<p>The <b>first</b> claimer owns the name. Both claimers find Eve, because <code>rdf:type</code> is only borrowed. But the second one gets Eve without a name, so its view has no match (“→ no match” in the tray) and draws nothing for her. ${evePersonFirst ? 'Here the Organization claimer still owns <code>ex:founded 2021</code>: a partial shape that no view uses.' : 'Here the Person claimer gets only the borrowed type.'}</p>
+<p><button class="btn primary" id="swap">${evePersonFirst ? 'Put Organization first' : 'Put Person first'}</button></p>`,
+    cli: () => evePersonFirst ? 'rdf claim person.trig | rdf claim organization.trig | …\n# Eve is a circle' : 'rdf claim organization.trig | rdf claim person.trig | …\n# Eve is a square',
+  },
+  {
+    title: 'The rest', k: 'What no view received',
+    cfg: () => ({ order: [...ALL], enabled: [...ALL], highlight: { quad: (q, r) => r.fate[q.i].owner === null } }),
+    html: () => `<p>Quads that no constraint read stay graphless and leave the pipe as the rest. The runtime controller publishes them to a named <code>remainderGraph</code>.</p>
+<p>The rest also holds the borrowed <code>rdf:type</code> quads (dashed in the bin). Those reached a view. The <b>complement</b> is <code>rest − frontier</code>: here <code>ex:favoriteColor</code>, <code>ex:shoeSize</code> and the two <code>ex:doc</code> quads. It shows what your claimers do not cover.</p>`,
+    cli: () => 'complement = input − (claimed ∪ frontier)\n# claimer-runtime/src/complement.js',
+  },
+  {
+    title: 'Try it', k: 'Your configuration',
+    cfg: () => ({ order: [...conf.order], enabled: [...conf.enabled] }),
+    html: () => `<p>Change the order or switch claimers off. This is the configuration a layer panel sends to <code>POST /api/claimer</code>: <code>order</code> holds every claimer one time, <code>enabled</code> holds one or more.</p>
+<div class="try">
+  <div class="panel"><h4>Cascade order</h4><ol class="order" id="order"></ol><div class="err" id="err" role="status"></div></div>
+  <div class="panel"><h4>POST /api/claimer</h4><pre class="json" id="json"></pre></div>
+</div>
+<div class="panel"><h4>Result of the whole cascade</h4><div class="tablewrap"><table class="res" id="res"></table></div></div>`,
+    cli: () => ['rdf read data.ttl', ...conf.order.filter((id) => conf.enabled.includes(id)).map((id) => '  | rdf claim ' + CLAIMERS[id].file), '  | rdf pretty --format trig'].join(' \\\n'),
+  },
+];
+
+let stepIx = 0;
+const stepsEl = $('steps');
+STEPS.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.setAttribute('role', 'tab'); b.id = 'step-' + i;
+  b.innerHTML = `<span class="n">${i + 1}</span>${s.title}`;
+  b.addEventListener('click', () => goStep(i));
+  stepsEl.append(b);
+});
+function goStep (i) {
+  stepIx = Math.max(0, Math.min(STEPS.length - 1, i));
+  const s = STEPS[stepIx];
+  [...stepsEl.children].forEach((b, k) => b.setAttribute('aria-selected', String(k === stepIx)));
+  $('narr').innerHTML = `<div class="k">Step ${stepIx + 1} of ${STEPS.length} · ${s.k}</div><h3>${s.title}</h3>${s.html()}<div class="cli">${esc(s.cli())}</div>`;
+  const sw = $('swap'); if (sw) sw.addEventListener('click', () => { evePersonFirst = !evePersonFirst; goStep(stepIx); });
+  if ($('order')) renderTry();
+  sim.configure(s.cfg());
+  sim.fastForward(reduced ? 60 : 2.5);
+  $('prev').disabled = stepIx === 0;
+  $('next').disabled = stepIx === STEPS.length - 1;
+}
+function renderTry () {
+  const ol = $('order'); ol.innerHTML = '';
+  conf.order.forEach((id, k) => {
+    const c = CLAIMERS[id], on = conf.enabled.includes(id);
+    const li = document.createElement('li'); if (!on) li.className = 'off';
+    li.innerHTML = `<span class="slot">${k + 1}</span><span class="name" style="color:${c.color}">${c.file}</span>
+<button class="mv" aria-label="Move ${c.label} up" ${k === 0 ? 'disabled' : ''}>↑</button>
+<button class="mv" aria-label="Move ${c.label} down" ${k === conf.order.length - 1 ? 'disabled' : ''}>↓</button>
+<input type="checkbox" id="en-${id}" aria-label="Enable ${c.label}" ${on ? 'checked' : ''}>`;
+    const [up, down] = li.querySelectorAll('.mv');
+    up.addEventListener('click', () => { const o = conf.order; [o[k], o[k - 1]] = [o[k - 1], o[k]]; goStep(stepIx); });
+    down.addEventListener('click', () => { const o = conf.order; [o[k], o[k + 1]] = [o[k + 1], o[k]]; goStep(stepIx); });
+    li.querySelector('input').addEventListener('change', (e) => {
+      if (!e.target.checked && conf.enabled.length === 1) { e.target.checked = true; $('err').textContent = 'enabled must contain one or more distinct claimers'; return; }
+      conf.enabled = e.target.checked ? [...conf.enabled, id] : conf.enabled.filter((x) => x !== id);
+      goStep(stepIx);
+    });
+    ol.append(li);
+  });
+  const live = conf.order.filter((id) => conf.enabled.includes(id));
+  $('json').textContent = `{\n  "order": ${JSON.stringify(conf.order)},\n  "enabled": ${JSON.stringify(live)}\n}`;
+  const r = computeCascade(conf.order, conf.enabled);
+  const rows = live.map((id) => {
+    const p = r.per[id], c = CLAIMERS[id], drawn = p.focus.filter((f) => f.ok);
+    return `<tr><td style="color:${c.color}">${c.label}</td><td>${p.owned.length}</td><td>${p.frontier.length}</td><td>${p.viewQuads}</td><td>${drawn.map((f) => f.label).join(', ') || '–'}</td></tr>`;
+  });
+  $('res').innerHTML = `<tr><th>claimer</th><th>own</th><th>borrow</th><th>view out</th><th>drawn</th></tr>${rows.join('')}
+<tr><td class="c-muted">rest</td><td colspan="4">${r.rest.length} graphless, complement ${r.complement.length}</td></tr>`;
+}
+$('prev').addEventListener('click', () => goStep(stepIx - 1));
+$('next').addEventListener('click', () => goStep(stepIx + 1));
+const syncPlay = () => { $('play').textContent = sim.playing ? 'Pause' : 'Play'; };
+$('play').addEventListener('click', () => { sim.playing = !sim.playing; syncPlay(); });
+$('restart').addEventListener('click', () => { sim.reset(); sim.playing = true; syncPlay(); });
+$('skip').addEventListener('click', () => { sim.reset(); sim.fastForward(60); sim.playing = false; syncPlay(); });
+$('speed').addEventListener('input', (e) => { sim.speed = +e.target.value; });
+
+// ---------------------------------------------------------------- claimer docs
+const PFX = `@prefix sh:      &lt;http://www.w3.org/ns/shacl#&gt; .
+@prefix ex:      &lt;http://example.org/&gt; .
+@prefix cascade: &lt;urn:rdf-cli:cascade#&gt; .`;
+const docFor = (c, props, query, extra = '') => `<span class="cm"># ${c.file}: one claimer = one named graph</span>
+${PFX}${extra}
+
+<span class="gr">&lt;${c.graph}&gt;</span> {
+  ex:${c.target}Shape a sh:NodeShape ;
+    <span class="kw">sh:targetClass</span> ex:${c.target} ;    <span class="cm"># rdf:type is borrowed, stays on the wire</span>
+${props}
+
+  <span class="gr">&lt;${c.view}&gt;</span> <span class="kw">cascade:query</span> <span class="st">"""
+    PREFIX ex:  &lt;http://example.org/&gt;
+    PREFIX viz: &lt;http://example.org/viz#&gt;${extra ? '\n    PREFIX geo: &lt;http://www.w3.org/2003/01/geo/wgs84_pos#&gt;' : ''}
+${query}"""</span> .
+}`;
+const DOCS = {
+  'data.ttl': `<span class="cm"># data.ttl: ${Q.length} quads. Skolemized and graphless after prepareClaimerInput.</span>
+@prefix ex:   &lt;http://example.org/&gt; .
+@prefix geo:  &lt;http://www.w3.org/2003/01/geo/wgs84_pos#&gt; .
+@prefix dct:  &lt;http://purl.org/dc/terms/&gt; .
+@prefix foaf: &lt;http://xmlns.com/foaf/0.1/&gt; .
+
+ex:ada    a ex:Person ; ex:name "Ada" ; ex:worksAt ex:acme ; ex:favoriteColor "teal" .
+ex:bob    a ex:Person ; ex:name "Bob" ; ex:worksAt ex:globex ; ex:shoeSize 44 .
+ex:cyd    a ex:Person ; ex:name "Cyd" .
+ex:eve    a ex:Person, ex:Organization ; ex:name "Eve" ; ex:founded 2021 .  <span class="cm"># two shapes want the name</span>
+ex:acme   a ex:Organization ; ex:name "ACME" ; ex:founded 1998 ; ex:locatedIn ex:berlin .
+ex:globex a ex:Organization ; ex:name "Globex" ; ex:founded 1989 ; ex:locatedIn ex:lima .
+ex:berlin a ex:Place ; ex:name "Berlin" ; geo:lat 52.5 .
+ex:lima   a ex:Place ; ex:name "Lima" ; geo:lat -12.0 .
+ex:doc    a foaf:Document ; dct:created "2026-10-02" .   <span class="cm"># no claimer targets this</span>`,
+  'person.trig': docFor(CLAIMERS.person,
+    `    sh:property [ <span class="kw">sh:path</span> ex:name ; sh:minCount 1 ] ,     <span class="cm"># owned</span>
+                [ <span class="kw">sh:path</span> ex:worksAt ] .                 <span class="cm"># owned → 2 per node</span>`,
+    `    CONSTRUCT { ?p a viz:Circle ; viz:label ?n ; viz:linksTo ?o }
+    WHERE {
+      ?p a ex:Person ; ex:name ?n .
+      OPTIONAL { ?p ex:worksAt ?o }
+    }`),
+  'organization.trig': docFor(CLAIMERS.org,
+    `    sh:property [ <span class="kw">sh:path</span> ex:name ; sh:minCount 1 ] ,
+                [ <span class="kw">sh:path</span> ex:founded ] ,
+                [ <span class="kw">sh:path</span> ex:locatedIn ] .               <span class="cm"># owned → 3 per node</span>`,
+    `    CONSTRUCT { ?o a viz:Square ; viz:label ?label ; viz:linksTo ?l }
+    WHERE {
+      ?o a ex:Organization ; ex:name ?n ; ex:founded ?y .
+      OPTIONAL { ?o ex:locatedIn ?l }
+      BIND (CONCAT(?n, " · ", STR(?y)) AS ?label)
+    }`),
+  'place.trig': docFor(CLAIMERS.place,
+    `    sh:property [ <span class="kw">sh:path</span> ex:name ; sh:minCount 1 ] ,
+                [ <span class="kw">sh:path</span> geo:lat ] .                    <span class="cm"># owned → 2 per node</span>`,
+    `    CONSTRUCT { ?l a viz:Triangle ; viz:label ?label }
+    WHERE {
+      ?l a ex:Place ; ex:name ?n ; geo:lat ?lat .
+      BIND (CONCAT(?n, " ", STR(?lat), "°") AS ?label)
+    }`, '\n@prefix geo:     &lt;http://www.w3.org/2003/01/geo/wgs84_pos#&gt; .'),
+};
+const tabsEl = $('doc-tabs');
+Object.keys(DOCS).forEach((k, i) => {
+  const b = document.createElement('button'); b.setAttribute('role', 'tab'); b.textContent = k; b.id = 'doc-' + i;
+  b.addEventListener('click', () => showDoc(k)); tabsEl.append(b);
+});
+function showDoc (k) {
+  [...tabsEl.children].forEach((b) => b.setAttribute('aria-selected', String(b.textContent === k)));
+  $('doc-body').innerHTML = DOCS[k];
+}
+showDoc('organization.trig');
+
+// ---------------------------------------------------------------- loop
+let last = performance.now();
+function frame (now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (sim.visible) { if (sim.playing) sim.update(dt); sim.draw(); }
+  requestAnimationFrame(frame);
+}
+goStep(0);
+if (reduced) { sim.playing = false; syncPlay(); }
+document.fonts?.ready.then(() => sim.widths.clear());
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
