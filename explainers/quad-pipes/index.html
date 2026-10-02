@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="RDF as a stream of quads: filter, map and sink pieces snap together like toy bricks. Nine examples show what each piece does, why the order of the pieces is the program, and the outputs of SELECT, pretty, canonicalize, skolem and ASK.">
+<title>Quad Pipes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap">
+<style>
+/* Layout: stream intro, nine examples (narration, slim brick rail, input and stdout side by side), rules. Palette and canvas style follow claimer-cascade; light mirrors it. */
+:root {
+  --bg: #0b1114;
+  --panel: #111a1f;
+  --panel-2: #16222a;
+  --line: #233139;
+  --fg: #e4ecef;
+  --muted: #8b9ea7;
+  --g-def: #e4ecef;
+  --g-hr: #ff7ac6;
+  --g-pub: #a8d8b0;
+  --bn: #e2b8ff;
+  --g-bob: #ffb347;
+  --row: #a493ff;
+  --text: #7fd3e6;
+  --bad: #ff5b4a;
+  --b-filter: #ff8a6b;
+  --b-map: #5cc8ff;
+  --b-sink: #f5c451;
+  --b-io: #8b9ea7;
+  --b-ink: #0b1114;
+  --b-ink-sink: #0b1114;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #0b1114; --panel: #111a1f; --panel-2: #16222a; --line: #233139; --fg: #e4ecef; --muted: #8b9ea7; --g-def: #e4ecef; --g-hr: #ff7ac6; --g-pub: #a8d8b0; --bn: #e2b8ff; --g-bob: #ffb347; --row: #a493ff; --text: #7fd3e6; --bad: #ff5b4a; --b-filter: #ff8a6b; --b-map: #5cc8ff; --b-sink: #f5c451; --b-io: #8b9ea7; --b-ink: #0b1114; --b-ink-sink: #0b1114; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #0b1114; --panel: #111a1f; --panel-2: #16222a; --line: #233139; --fg: #e4ecef; --muted: #8b9ea7; --g-def: #e4ecef; --g-hr: #ff7ac6; --g-pub: #a8d8b0; --bn: #e2b8ff; --g-bob: #ffb347; --row: #a493ff; --text: #7fd3e6; --bad: #ff5b4a; --b-filter: #ff8a6b; --b-map: #5cc8ff; --b-sink: #f5c451; --b-io: #8b9ea7; --b-ink: #0b1114; --b-ink-sink: #0b1114; color-scheme: dark; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) { --bg: #f3f6f7; --panel: #ffffff; --panel-2: #e8eef1; --line: #d2dce1; --fg: #0f1a1f; --muted: #56676f; --g-def: #0f1a1f; --g-hr: #b1307f; --g-pub: #2e7a45; --bn: #9a3fc4; --g-bob: #a85b00; --row: #5440d0; --text: #0a6f86; --bad: #c8261a; --b-filter: #d4512c; --b-map: #0a7cc0; --b-sink: #a87500; --b-io: #6b7c85; --b-ink: #ffffff; --b-ink-sink: #ffffff; color-scheme: light; }
+}
+:root[data-theme="light"] { --bg: #f3f6f7; --panel: #ffffff; --panel-2: #e8eef1; --line: #d2dce1; --fg: #0f1a1f; --muted: #56676f; --g-def: #0f1a1f; --g-hr: #b1307f; --g-pub: #2e7a45; --bn: #9a3fc4; --g-bob: #a85b00; --row: #5440d0; --text: #0a6f86; --bad: #c8261a; --b-filter: #d4512c; --b-map: #0a7cc0; --b-sink: #a87500; --b-io: #6b7c85; --b-ink: #ffffff; --b-ink-sink: #ffffff; color-scheme: light; }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--bg); color: var(--fg); }
+body { margin: 0; font: 15px/1.6 var(--body); padding-inline: 16px; padding-block: 0 64px; font-variant-ligatures: none; }
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 56px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 5.5vw, 3.8rem); line-height: 1.02; }
+h2 { font-size: clamp(1.6rem, 3.4vw, 2.2rem); line-height: 1.1; }
+h3 { font-size: 1.3rem; }
+p { margin: 0; max-width: 68ch; }
+code, pre, .mono { font-family: var(--mono); font-size: 0.86em; }
+code { color: var(--row); }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--b-map); outline-offset: 2px; }
+.c-muted { color: var(--muted); }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.sec-head { display: grid; gap: 14px; min-width: 0; }
+.k-filter, .k-map, .k-sink { font: 600 0.8em/1 var(--mono); padding: 3px 7px; border-radius: 4px; letter-spacing: .04em; white-space: nowrap; }
+.k-filter { background: var(--b-filter); color: var(--b-ink); }
+.k-map { background: var(--b-map); color: var(--b-ink); }
+.k-sink { background: var(--b-sink); color: var(--b-ink-sink); }
+
+header.hero { padding-top: 48px; display: grid; gap: 18px; }
+.lede { font-size: 1.1rem; }
+pre.src { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.55; max-width: 560px; }
+.gp { display: inline-block; font: 500 11px/1 var(--mono); padding: 3px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.gp.hr { color: var(--g-hr); border-color: color-mix(in srgb, var(--g-hr) 50%, transparent); }
+.gp.pub { color: var(--g-pub); border-color: color-mix(in srgb, var(--g-pub) 50%, transparent); }
+.gp.bob { color: var(--g-bob); border-color: color-mix(in srgb, var(--g-bob) 50%, transparent); }
+.t-lit { color: var(--text); }
+.t-bn { color: var(--bn); }
+
+/* rail canvas */
+.steps { display: flex; flex-wrap: wrap; gap: 6px; }
+.steps button { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px 6px 8px; cursor: pointer; display: inline-flex; gap: 8px; align-items: center; color: var(--muted); font-size: 14px; }
+.steps button .n { font: 600 11px/1 var(--mono); width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--panel-2); color: var(--muted); }
+.steps button[aria-selected="true"] { border-color: var(--fg); color: var(--fg); }
+.steps button[aria-selected="true"] .n { background: var(--fg); color: var(--bg); }
+.narr { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.narr ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; max-width: 80ch; }
+.cli { font: 12.5px/1.55 var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; color: var(--muted); }
+.cli b { color: var(--fg); font-weight: 600; }
+.stage { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.stage canvas { display: block; width: 100%; min-width: 760px; aspect-ratio: 1200 / 420; touch-action: pan-y; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 14px; }
+.btn:hover { border-color: var(--muted); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
+.btn.sm { font-size: 12px; padding: 4px 8px; }
+.toolbar label { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); font-size: 13px; }
+.toolbar input[type=range] { width: 110px; accent-color: var(--b-map); }
+.spacer { flex: 1; }
+@keyframes in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+.laws { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.law { border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 6px; align-content: start; }
+.law .f { font: 600 14px var(--mono); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.law p { color: var(--muted); font-size: 14px; }
+.note { border-left: 2px solid var(--muted); padding-left: 14px; color: var(--muted); font-size: 14px; display: grid; gap: 6px; }
+footer { color: var(--muted); font-size: 13px; }
+footer a { color: inherit; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">RDF on a Unix pipe</div>
+  <h1>Snap pieces together. Quads flow through them.</h1>
+  <p class="lede">Between two commands, RDF travels as N-Quads: one line per statement, four columns, subject, predicate, object and graph. Each command is a piece. It reads quads from the piece before it and writes quads to the piece after it. It does not know what the other pieces do. So the order of the pieces is the program.</p>
+  <p class="c-muted">There are three kinds of piece. A <span class="k-filter">FILTER</span> passes a quad or drops it. A <span class="k-map">MAP</span> rewrites a quad. Both look at one quad at a time. A <span class="k-sink">SINK</span> must receive the whole stream before it writes anything.</p>
+</header>
+
+<section class="sec-head" aria-labelledby="in-h">
+  <div class="eyebrow">The input</div>
+  <h2 id="in-h">One file, eleven quads</h2>
+  <p class="c-muted"><code>rdf read people.trig</code> turns this file into eleven N-Quads lines. Nine statements have no graph: they are in the <b>default graph</b>. The two salaries are in the named graph <span class="gp hr">urn:g:hr</span>. Alice's address is a blank node: a node without a global name. The task in the first examples: publish this data without the private parts.</p>
+  <pre class="src" id="trig"></pre>
+</section>
+
+<section class="sec-head" aria-labelledby="ex-h">
+  <div class="eyebrow">Nine examples</div>
+  <h2 id="ex-h">Filter, map, sink</h2>
+  <div class="steps" role="tablist" id="steps"></div>
+  <div class="narr" id="narr"></div>
+  <div class="stage"><canvas id="cv-ex" aria-label="Animation: quads leave rdf read, pass through the pieces of the pipe and arrive at stdout"></canvas></div>
+  <div class="toolbar">
+    <button class="btn" id="prev">← Previous</button>
+    <button class="btn primary" id="next">Next example →</button>
+    <span class="spacer"></span>
+    <button class="btn" id="ex-play">Pause</button>
+    <button class="btn" id="ex-restart">Restart</button>
+    <button class="btn" id="ex-skip">Jump to end</button>
+    <label for="ex-speed">Speed <input type="range" id="ex-speed" min="0.25" max="3" step="0.25" value="1"></label>
+  </div>
+</section>
+
+<section class="sec-head" aria-labelledby="r-h">
+  <div class="eyebrow">Rules</div>
+  <h2 id="r-h">What to keep in mind when you compose</h2>
+  <div class="laws">
+    <div class="law"><div class="f"><span class="k-filter">FILTER</span><span class="k-map">MAP</span></div><p>One quad in, zero or one quad out. They hold one quad at a time, so they start to write at once and use little memory. Like <code>Array.filter</code> and <code>Array.map</code>.</p></div>
+    <div class="law"><div class="f"><span class="k-sink">SINK</span></div><p>Holds the whole stream until EOF. Its result can depend on any quad, also the last one. CONSTRUCT, SELECT, canonicalize and serializers are sinks.</p></div>
+    <div class="law"><div class="f">Connectors must fit</div><p>A round connector carries quads. A square one carries JSON rows (after SELECT). A pointed one carries text (after pretty or ask). The shell does not check this: a misfit fails at run time, on line 1.</p></div>
+    <div class="law"><div class="f">Line order has no meaning</div><p>A set of quads has no order, and two tools can write the same quads in a different order. To compare: <code>diff &lt;(… | rdf canonicalize) &lt;(… | rdf canonicalize)</code>.</p></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+(() => {
+'use strict';
+// ================================================================ terms and data
+const EX = 'http://example.org/', FOAF = 'http://xmlns.com/foaf/0.1/';
+const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#', XSD = 'http://www.w3.org/2001/XMLSchema#';
+const GENID = 'https://rdf-viz.local/.well-known/genid/';
+const G_HR = 'urn:g:hr', G_PUB = 'urn:g:public';
+const I = (v) => ({ t: 'iri', v });
+const B = (v) => ({ t: 'bnode', v });
+const L = (v, dt) => ({ t: 'lit', v, lang: '', dt: dt || XSD + 'string' });
+let seq = 0;
+const Q = (s, p, o, g) => ({ s, p, o, g: g ? I(g) : null, id: 'q' + (++seq) });
+// the order of rdf read (rdf-cli 0.4.0) on people.trig
+const SRC = [
+  Q(I(EX + 'alice'), I(RDF + 'type'), I(FOAF + 'Person')),
+  Q(I(EX + 'alice'), I(FOAF + 'name'), L('Alice')),
+  Q(I(EX + 'alice'), I(FOAF + 'mbox'), I('mailto:alice@example.org')),
+  Q(I(EX + 'alice'), I(FOAF + 'knows'), I(EX + 'bob')),
+  Q(B('b0_n3-0'), I(EX + 'city'), L('Lyon')),
+  Q(I(EX + 'alice'), I(EX + 'address'), B('b0_n3-0')),
+  Q(I(EX + 'bob'), I(RDF + 'type'), I(FOAF + 'Person')),
+  Q(I(EX + 'bob'), I(FOAF + 'name'), L('Bob')),
+  Q(I(EX + 'bob'), I(FOAF + 'mbox'), I('mailto:bob@example.org')),
+  Q(I(EX + 'alice'), I(EX + 'salary'), L('5200', XSD + 'integer'), G_HR),
+  Q(I(EX + 'bob'), I(EX + 'salary'), L('4800', XSD + 'integer'), G_HR),
+];
+const TRIG = `@prefix ex: &lt;http://example.org/&gt; .
+@prefix foaf: &lt;http://xmlns.com/foaf/0.1/&gt; .
+
+ex:alice a foaf:Person ;
+  foaf:name "Alice" ;
+  foaf:mbox &lt;mailto:alice@example.org&gt; ;
+  foaf:knows ex:bob ;
+  ex:address [ ex:city "Lyon" ] .
+
+ex:bob a foaf:Person ;
+  foaf:name "Bob" ;
+  foaf:mbox &lt;mailto:bob@example.org&gt; .
+
+<span style="color:var(--g-hr)">&lt;urn:g:hr&gt;</span> {
+  ex:alice ex:salary 5200 .
+  ex:bob   ex:salary 4800 .
+}`;
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const eqT = (a, b) => (a === null || b === null) ? a === b : a.t === b.t && a.v === b.v && a.lang === b.lang && a.dt === b.dt;
+const nt = (x) => {
+  if (x.t === 'iri') return `<${x.v}>`;
+  if (x.t === 'bnode') return `_:${x.v}`;
+  const s = '"' + x.v.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+  if (x.lang) return s + '@' + x.lang;
+  return x.dt === XSD + 'string' ? s : `${s}^^<${x.dt}>`;
+};
+const nqLine = (q) => `${nt(q.s)} ${nt(q.p)} ${nt(q.o)}${q.g ? ' ' + nt(q.g) : ''} .`;
+const PFX = [[RDF, 'rdf:'], [FOAF, 'foaf:'], [EX, 'ex:'], [XSD, 'xsd:'], [GENID, 'genid:']];
+const short = (x) => {
+  if (x.t === 'iri') { for (const [ns, p] of PFX) if (x.v.startsWith(ns)) return p + x.v.slice(ns.length); return `<${x.v}>`; }
+  if (x.t === 'bnode') return `_:${x.v}`;
+  if (x.dt === XSD + 'integer') return x.v;
+  return `"${x.v}"` + (x.lang ? '@' + x.lang : '');
+};
+const termHtml = (x) => `<span class="${x.t === 'lit' ? 't-lit' : x.t === 'bnode' || x.v.startsWith(GENID) ? 't-bn' : ''}">${esc(short(x))}</span>`;
+const gCls = (g) => (!g ? '' : g.v === G_HR ? 'hr' : g.v === G_PUB ? 'pub' : '');
+const gPill = (g) => `<span class="gp ${gCls(g)}">${g ? esc(g.v) : 'default'}</span>`;
+const mapTerms = (q, f) => ({ ...q, s: f(q.s), p: f(q.p), o: f(q.o), g: q.g && f(q.g) });
+
+// ================================================================ serializers used by the sinks (layout of rdf pretty)
+const PRETTY_PFX = [['ex', EX], ['foaf', FOAF]]; // the content of prefixes.json
+const pname = (x) => {
+  if (x.t !== 'iri') return nt(x);
+  for (const [p, ns] of PRETTY_PFX) if (x.v.startsWith(ns) && /^[A-Za-z_][\w-]*$/.test(x.v.slice(ns.length))) return `${p}:${x.v.slice(ns.length)}`;
+  return nt(x);
+};
+function pretty (quads, turtle) {
+  const used = PRETTY_PFX.filter(([, ns]) => quads.some((q) => [q.s, q.p, q.o].some((t) => t.t === 'iri' && t.v.startsWith(ns))));
+  const head = used.map(([p, ns]) => `@prefix ${p}: <${ns}>.`).join('\n');
+  const groups = new Map();
+  for (const q of quads) {
+    const g = turtle || !q.g ? '' : q.g.v;
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(q);
+  }
+  const blocks = [];
+  for (const g of [...groups.keys()].sort()) {
+    const ind = g ? '  ' : '';
+    const bySubj = new Map();
+    for (const q of groups.get(g)) {
+      const sk = nt(q.s);
+      if (!bySubj.has(sk)) bySubj.set(sk, { term: q.s, preds: new Map() });
+      const pm = bySubj.get(sk).preds;
+      if (!pm.has(q.p.v)) pm.set(q.p.v, []);
+      const objs = pm.get(q.p.v);
+      if (!objs.some((o) => eqT(o, q.o))) objs.push(q.o);
+    }
+    // a blank node used once as an object is written inline: [ ... ]
+    const uses = new Map();
+    for (const q of groups.get(g)) if (q.o.t === 'bnode') uses.set(q.o.v, (uses.get(q.o.v) || 0) + 1);
+    const inline = (o) => o.t === 'bnode' && uses.get(o.v) === 1 && bySubj.has(nt(o));
+    const predName = (p) => (p === RDF + 'type' ? 'a' : pname(I(p)));
+    const sortPreds = (pm) => [...pm.keys()].sort((a, b) => (a === RDF + 'type' ? -1 : b === RDF + 'type' ? 1 : a < b ? -1 : 1));
+    const obj = (o) => {
+      if (o.t === 'lit' && o.dt === XSD + 'integer') return o.v;
+      if (inline(o)) {
+        const pm = bySubj.get(nt(o)).preds;
+        return '[\n' + sortPreds(pm).map((p) => `${ind}      ${predName(p)} ${pm.get(p).map(obj).join(', ')}`).join(';\n') + `\n${ind}    ]`;
+      }
+      return pname(o);
+    };
+    const subjBlocks = [...bySubj.keys()].filter((k) => !inline(bySubj.get(k).term)).sort().map((sk) => {
+      const pm = bySubj.get(sk).preds;
+      const preds = sortPreds(pm);
+      const line = (p) => {
+        const os = pm.get(p);
+        return os.length === 1 ? `${predName(p)} ${obj(os[0])}` : `${predName(p)}\n${os.map((o) => ind + '    ' + obj(o)).join(',\n')}`;
+      };
+      let out = ind + pname(bySubj.get(sk).term);
+      let rest = preds;
+      if (preds[0] === RDF + 'type') { out += ' ' + line(preds[0]); rest = preds.slice(1); if (rest.length) out += ';'; }
+      rest.forEach((p, i) => { out += '\n' + ind + '  ' + line(p) + (i < rest.length - 1 ? ';' : ''); });
+      return out + '.';
+    });
+    blocks.push(g ? `<${g}> {\n${subjBlocks.join('\n\n')}\n}` : subjBlocks.join('\n\n'));
+  }
+  return (head ? head + '\n\n' : '') + blocks.join('\n\n');
+}
+// canonical form for inputs with few blank nodes: label them c14n0, c14n1, ... then sort the lines
+function canonical (qs) {
+  const order = [...qs].sort((a, b) => (nqLine(mapTerms(a, (t) => (t.t === 'bnode' ? B('') : t))) < nqLine(mapTerms(b, (t) => (t.t === 'bnode' ? B('') : t))) ? -1 : 1));
+  const labels = new Map();
+  order.forEach((q) => [q.s, q.o, q.g].forEach((t) => { if (t && t.t === 'bnode' && !labels.has(t.v)) labels.set(t.v, 'c14n' + labels.size); }));
+  return qs.map((q) => mapTerms(q, (t) => (t.t === 'bnode' ? B(labels.get(t.v)) : t))).sort((a, b) => (nqLine(a) < nqLine(b) ? -1 : 1));
+}
+
+// ================================================================ pieces
+// Stream types: nq = quads (round connector), jsonl = JSON rows (square), text = text (pointed).
+const pfxF = 'PREFIX foaf: <http://xmlns.com/foaf/0.1/> ';
+const pfxE = 'PREFIX ex: <http://example.org/> ';
+const withQ = (q, patch) => ({ ...q, ...patch });
+const knowsPairs = (qs) => {
+  const pairs = [];
+  qs.forEach((a, i) => { if (!a.g && a.p.v === FOAF + 'knows') qs.forEach((b, j) => { if (!b.g && b.p.v === FOAF + 'name' && b.s.v === a.o.v) pairs.push([i, j]); }); });
+  return pairs;
+};
+const UUIDS = ['e51ee1fe-f879-4018-b45a-af43f2dec7a1', '59a49108-8307-4812-8937-6ba337992dbc'];
+const hasSalary = (qs, inGraph) => qs.some((q) => q.p.v === EX + 'salary' && (inGraph ? !!q.g : !q.g));
+const CMDS = {
+  fNoMbox: { kind: 'filter', args: ['?p != foaf:mbox'], cmd: `rdf filter '?p != <http://xmlns.com/foaf/0.1/mbox>'`, in: 'nq', out: 'nq',
+    fn: (q) => (q.p.v === FOAF + 'mbox' ? null : q) },
+  fDefault: { kind: 'filter', args: ['!bound(?g)'], cmd: `rdf filter '!bound(?g)'`, in: 'nq', out: 'nq',
+    fn: (q) => (q.g ? null : q) },
+  mPublic: { kind: 'map', args: ['-g <urn:g:public>'], cmd: `rdf map -g '<urn:g:public>'`, in: 'nq', out: 'nq',
+    fn: (q) => withQ(q, { g: I(G_PUB) }) },
+  mMask: { kind: 'map', args: ['if ?p = foaf:mbox', 'then -o <mailto:hidden@…>'], cmd: `rdf map --where '?p = <http://xmlns.com/foaf/0.1/mbox>' -o '<mailto:hidden@example.org>'`, in: 'nq', out: 'nq',
+    fn: (q) => (q.p.v === FOAF + 'mbox' ? withQ(q, { o: I('mailto:hidden@example.org') }) : q) },
+  skolem: { kind: 'map', name: 'skolem', args: ['_:b → genid IRI'], cmd: `rdf skolem`, in: 'nq', out: 'nq',
+    fn: (q, st) => { // a map with memory: the same blank node gets the same IRI
+      st.ids = st.ids || new Map();
+      return mapTerms(q, (t) => { if (t.t !== 'bnode') return t; if (!st.ids.has(t.v)) st.ids.set(t.v, I(GENID + UUIDS[st.ids.size % UUIDS.length])); return st.ids.get(t.v); });
+    } },
+  cKnowsName: { kind: 'sink', name: 'construct', args: ['?a knowsName ?n'], cmd: `rdf construct '${pfxF}${pfxE}CONSTRUCT { ?a ex:knowsName ?n } WHERE { ?a foaf:knows ?b . ?b foaf:name ?n }'`, in: 'nq', out: 'nq',
+    fn: (qs) => knowsPairs(qs).map(([i, j], n) => ({ s: qs[i].s, p: I(EX + 'knowsName'), o: qs[j].o, g: null, id: 'c' + n })),
+    links: knowsPairs },
+  canon: { kind: 'sink', name: 'canonicalize', args: ['sorted, _:c14n labels'], cmd: `rdf canonicalize`, in: 'nq', out: 'nq',
+    fn: (qs) => canonical(qs).map((q, i) => ({ ...q, id: 'k' + i })) },
+  sNames: { kind: 'sink', name: 'select', args: ['?s ?name'], cmd: `rdf select '${pfxF}SELECT ?s ?name WHERE { ?s foaf:name ?name }'`, in: 'nq', out: 'jsonl',
+    fn: (qs) => qs.filter((q) => !q.g && q.p.v === FOAF + 'name').map((q) => ({ s: q.s.v, name: q.o.v })) },
+  prettyTrig: { kind: 'sink', name: 'pretty', args: ['TriG', '-p prefixes.json'], cmd: `rdf pretty --prefixes prefixes.json`, in: 'nq', out: 'text',
+    fn: (qs) => pretty(qs, false).split('\n').filter((l) => l.trim()) },
+  prettyTtl: { kind: 'sink', name: 'pretty', args: ['--format turtle', '-p prefixes.json'], cmd: `rdf pretty --format turtle --prefixes prefixes.json`, in: 'nq', out: 'text',
+    fn: (qs) => pretty(qs, true).split('\n').filter((l) => l.trim()) },
+  askPay: { kind: 'sink', name: 'ask', args: ['{ ?s ex:salary ?pay }'], cmd: `rdf ask '${pfxE}ASK { ?s ex:salary ?pay }'`, in: 'nq', out: 'text',
+    fn: (qs) => [String(hasSalary(qs, false))], exit: (qs) => (hasSalary(qs, false) ? 0 : 1) },
+  askPayG: { kind: 'sink', name: 'ask', args: ['{ GRAPH ?g { … } }'], cmd: `rdf ask '${pfxE}ASK { GRAPH ?g { ?s ex:salary ?pay } }'`, in: 'nq', out: 'text',
+    fn: (qs) => [String(hasSalary(qs, true))], exit: (qs) => (hasSalary(qs, true) ? 0 : 1) },
+};
+const shellText = (keys) => ['rdf read people.trig', ...keys.map((k) => CMDS[k].cmd)]
+  .map((l) => `<b>${esc(l)}</b>`).join(' | ');
+
+const $ = (id) => document.getElementById(id);
+$('trig').innerHTML = TRIG;
+
+// ================================================================ lane model
+// A lane is one pipe: source, command pieces, stdout, side by side on a slim rail.
+// Every token gets timed moves; the picture at time t is a pure function of the model.
+const SW = 1200, V = 230, DT = 0.62, RB = 15, CH = 9, GAP = 4;
+const W = { src: 120, filter: 170, map: 170, sink: 236, out: 120 };
+const lastName = (v) => v.replace(/^.*[/#:]/, '');
+const tShort = (x) => {
+  if (x.t === 'lit') return x.v;
+  if (x.t === 'bnode') return '_:' + x.v.split('_')[0];
+  if (x.v.startsWith('mailto:')) return x.v.slice(7).split('@')[0] + '@…';
+  if (x.v.startsWith(GENID)) return 'genid:' + x.v.slice(GENID.length, GENID.length + 4) + '…';
+  return lastName(x.v);
+};
+const twoLine = (pc) => pc.def && pc.def.args.length > 1;
+const tokLabel = (kind, p) => {
+  if (kind === 'quad') return `${tShort(p.s)} ${tShort(p.p)} ${tShort(p.o)}`;
+  if (kind === 'row') return Object.values(p).map((v) => (/^(http|urn)/.test(v) ? lastName(v) : v)).join(' · ');
+  if (kind === 'text') { const s = p.trim().replace(/<[^>]*[/#:]([^/#:>]+)>/g, '$1'); return s.length > 14 ? s.slice(0, 13) + '…' : s; } // IRIs shortened to their last part
+  return 'EOF';
+};
+function buildLane (keys, py) {
+  const pieces = [{ kind: 'src', w: W.src, out: 'nq' }];
+  keys.forEach((k) => { const d = CMDS[k]; pieces.push({ kind: d.kind, key: k, def: d, w: W[d.kind], in: d.in, out: d.out }); });
+  pieces.push({ kind: 'out', w: W.out });
+  // a short pipe gets wider pieces, so that the quads have room in the channel
+  const raw = pieces.reduce((a, p) => a + p.w + GAP, -GAP);
+  if (keys.length && raw < 900) pieces.slice(1, -1).forEach((p) => { p.w += (900 - raw) / keys.length; });
+  let x = 0; for (const p of pieces) { p.x = x; x += p.w + GAP; }
+  const lane = { pieces, total: x - GAP, py, toks: [], lines: [], exit: 0,
+    hasSink: keys.some((k) => CMDS[k].kind === 'sink'), hasFilter: keys.some((k) => CMDS[k].kind === 'filter') };
+  const toks = lane.toks;
+  const tok = (kind, payload, t, x0) => { const k = { kind, states: [{ t, payload }], segs: [], born: t, dead: Infinity, x: x0, y: py }; toks.push(k); return k; };
+  const move = (k, t0, t1, x0, y0, x1, y1, mode = 'pipe') => k.segs.push({ t0, t1, x0, y0, x1, y1, mode });
+  const xStart = pieces[0].w - 50;
+  let stream = SRC.map((q, i) => ({ tok: tok('quad', q, i * DT, xStart), t: i * DT }));
+  stream.push({ tok: tok('eof', null, SRC.length * DT, xStart), t: SRC.length * DT });
+  let xPrev = xStart;
+  pieces.slice(1, -1).forEach((pc) => {
+    const def = pc.def;
+    const x = pc.kind === 'filter' ? pc.x + pc.w - 36 : pc.x + pc.w / 2;
+    pc.px = x; pc.drops = []; pc.fills = []; pc.R = Infinity; pc.eofIn = Infinity; pc.outN = 0; pc.links = []; pc.state = {};
+    const arr = (it) => it.t + (x - xPrev) / V;
+    stream.forEach((it) => move(it.tok, it.t, arr(it), xPrev, py, x, py));
+    const data = stream.filter((it) => it.tok.kind !== 'eof');
+    const eof = stream.find((it) => it.tok.kind === 'eof');
+    const tE = arr(eof);
+    const pay = (it) => it.tok.states[it.tok.states.length - 1].payload;
+    let out = [];
+    if (pc.kind !== 'sink') {
+      data.forEach((it) => {
+        const a = arr(it), q = pay(it), q2 = def.fn(q, pc.state);
+        if (!q2) { move(it.tok, a, a + 0.6, x, py, x, py + 58, 'fall'); it.tok.dead = a + 1.3; pc.drops.push(a + 0.6); return; }
+        if (['s', 'p', 'o', 'g'].some((k) => !eqT(q2[k], q[k]))) it.tok.states.push({ t: a, payload: q2, flash: true });
+        out.push({ tok: it.tok, t: a });
+      });
+      out.push({ tok: eof.tok, t: tE });
+      pc.exitCode = 0;
+    } else {
+      const payloads = data.map(pay);
+      pc.links = def.links ? def.links(payloads) : [];
+      const R = tE + 0.35 + (pc.links.length ? 1.6 : 0.6);
+      pc.R = R; pc.eofIn = tE; pc.slots = [];
+      data.forEach((it, k) => {
+        const a = arr(it), sx = pc.x + pc.w / 2 + ((k % 3) - 1) * 72, sy = py - 138 + Math.floor(k / 3) * 22;
+        move(it.tok, a, a + 0.4, x, py, sx, sy, 'chip'); it.tok.dead = R; pc.fills.push(a + 0.4); pc.slots.push({ x: sx, y: sy });
+      });
+      move(eof.tok, tE, tE + 0.35, x, py, x, py - 44, 'chip'); eof.tok.dead = R;
+      const outP = def.fn(payloads);
+      const kind = def.out === 'nq' ? 'quad' : def.out === 'jsonl' ? 'row' : 'text';
+      const step = kind === 'text' ? DT * 0.65 : DT;
+      pc.outN = outP.length; pc.step = step;
+      out = outP.map((p, j) => ({ tok: tok(kind, p, R + j * step, x), t: R + j * step }));
+      const tx = R + outP.length * step;
+      out.push({ tok: tok('eof', null, tx, x), t: tx });
+      pc.exitCode = def.exit ? def.exit(payloads) : 0;
+    }
+    stream = out; xPrev = x;
+  });
+  const outPc = pieces[pieces.length - 1];
+  outPc.in = pieces[pieces.length - 2].out;
+  lane.exit = pieces.length > 2 ? pieces[pieces.length - 2].exitCode : 0;
+  const xT = outPc.x + 26;
+  stream.forEach((it) => {
+    const a = it.t + (xT - xPrev) / V;
+    move(it.tok, it.t, a, xPrev, py, xT, py); it.tok.dead = a;
+    lane.lines.push({ t: a, kind: it.tok.kind, payload: it.tok.states[it.tok.states.length - 1].payload });
+  });
+  lane.end = Math.max(...lane.lines.map((l) => l.t), ...toks.map((k) => (k.dead === Infinity ? 0 : k.dead))) + 0.8;
+  return lane;
+}
+function posOf (k, t) {
+  if (t < k.born || t >= k.dead) return null;
+  let seg = null, prev = null;
+  for (const s of k.segs) { if (t >= s.t0 && t < s.t1) { seg = s; break; } if (t >= s.t1) prev = s; }
+  if (seg) { const f = (t - seg.t0) / (seg.t1 - seg.t0); return { x: seg.x0 + (seg.x1 - seg.x0) * f, y: seg.y0 + (seg.y1 - seg.y0) * f, mode: seg.mode, f }; }
+  if (prev) return { x: prev.x1, y: prev.y1, mode: prev.mode, f: 1, after: t - prev.t1 };
+  return { x: k.x, y: k.y, mode: 'pipe', f: 0 };
+}
+
+// ================================================================ drawing
+const C = {};
+const COLOR_KEYS = ['bg', 'panel', 'panel-2', 'line', 'fg', 'muted', 'g-def', 'g-hr', 'g-pub', 'bn', 'row', 'text', 'bad', 'b-filter', 'b-map', 'b-sink', 'b-io', 'b-ink'];
+const readColors = () => { const cs = getComputedStyle(document.documentElement); for (const k of COLOR_KEYS) C[k] = cs.getPropertyValue('--' + k).trim(); };
+const MONO = getComputedStyle(document.documentElement).getPropertyValue('--mono');
+// a token color (#rrggbb) with alpha, as hexA() in claimer-cascade
+const hexA = (hex, a) => { const n = parseInt(hex.replace('#', '').slice(0, 6), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+const typeColor = (t) => (t === 'jsonl' ? C.row : t === 'text' ? C.text : C.muted);
+const tokColor = (k, p) => (k === 'row' ? C.row : k === 'text' ? C.text : k === 'eof' ? C.muted : !p.g ? C['g-def'] : p.g.v === G_HR ? C['g-hr'] : C['g-pub']);
+const hasBlank = (k, p) => k === 'quad' && [p.s, p.o].some((t) => t.t === 'bnode' || (t.t === 'iri' && t.v.startsWith(GENID)));
+const pieceFill = (kind) => (kind === 'filter' ? C['b-filter'] : kind === 'map' ? C['b-map'] : kind === 'sink' ? C['b-sink'] : C['b-io']);
+const laneTop = (lane) => lane.py - (lane.hasSink ? 180 : 44) - (lane.pieces.some(twoLine) ? 14 : 0);
+// the two ends of the pipe: input lines above rdf read, stdout lines below stdout
+const LIST = { rows: 8, rowH: 17, head: 26, wIn: 440, wOut: 480 };
+const LIST_H = LIST.head + LIST.rows * LIST.rowH + 8;
+const inTop = (lane) => laneTop(lane) - 14 - LIST_H;
+const outTop = (lane) => lane.py + (lane.hasFilter ? 96 : 42);
+const quadText = (q) => `${short(q.s)} ${short(q.p)} ${short(q.o)}`;
+const graphColor = (g) => (!g ? C.muted : g.v === G_HR ? C['g-hr'] : C['g-pub']);
+function drawList (ctx, x, y, w, title, meta, rows, offset) {
+  const font = (px, wt = 400) => { ctx.font = `${wt} ${px}px ${MONO}`; };
+  const fit = (str, maxW) => { if (ctx.measureText(str).width <= maxW) return str; while (str.length && ctx.measureText(str + '…').width > maxW) str = str.slice(0, -1); return str + '…'; };
+  ctx.beginPath(); ctx.roundRect(x, y, w, LIST_H, 8); ctx.fillStyle = hexA(C.bg, 0.82); ctx.fill(); ctx.strokeStyle = C.line; ctx.lineWidth = 1.2; ctx.stroke();
+  ctx.textBaseline = 'middle';
+  font(10.5, 600); ctx.fillStyle = C.muted; ctx.textAlign = 'left'; ctx.fillText(title, x + 12, y + 14);
+  font(10); ctx.textAlign = 'right'; ctx.fillText(meta, x + w - 12, y + 14);
+  ctx.fillStyle = C.line; ctx.fillRect(x + 1, y + LIST.head - 2, w - 2, 1);
+  rows.slice(offset, offset + LIST.rows).forEach((r, k) => {
+    const ry = y + LIST.head + 4 + k * LIST.rowH;
+    ctx.save(); ctx.globalAlpha = r.alpha ?? 1;
+    if (r.now) { ctx.fillStyle = C['panel-2']; ctx.beginPath(); ctx.roundRect(x + 3, ry, w - 6, LIST.rowH, 3); ctx.fill(); }
+    const cy = ry + LIST.rowH / 2;
+    font(10.5); ctx.textAlign = 'right'; ctx.fillStyle = C.muted; if (r.n !== undefined) ctx.fillText(String(r.n), x + 26, cy);
+    let right = x + w - 8;
+    if (r.pill) { font(9.5, 600); ctx.textAlign = 'right'; ctx.fillStyle = r.pillColor; ctx.fillText(r.pill, right, cy); right -= ctx.measureText(r.pill).width + 10; }
+    font(10.5); ctx.textAlign = 'left'; ctx.fillStyle = r.color;
+    ctx.fillText(fit(r.text, right - (x + 34)), x + 34, cy);
+    ctx.restore();
+  });
+  if (rows.length > LIST.rows) { // scroll position
+    const trackH = LIST.rows * LIST.rowH, barH = trackH * LIST.rows / rows.length;
+    ctx.fillStyle = C.line; ctx.fillRect(x + w - 3, y + LIST.head + 4 + trackH * offset / rows.length, 2, barH);
+  }
+}
+function drawEnds (ctx, lane, t, showInput) {
+  const py = lane.py, src = lane.pieces[0], out = lane.pieces[lane.pieces.length - 1];
+  const arrow = (x, y0, y1) => { ctx.strokeStyle = hexA(C.muted, 0.7); ctx.fillStyle = hexA(C.muted, 0.7); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1 - 5); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x - 4, y1 - 6); ctx.lineTo(x + 4, y1 - 6); ctx.lineTo(x, y1); ctx.closePath(); ctx.fill(); };
+  if (showInput) {
+    const y = inTop(lane), n = SRC.length;
+    const rows = SRC.map((q, i) => {
+      const read = t >= i * DT, now = read && t < (i + 1) * DT;
+      return { n: i + 1, text: quadText(q), color: C.fg, pill: q.g ? q.g.v : 'default', pillColor: graphColor(q.g), alpha: read && !now ? 0.35 : 1, now };
+    });
+    const eofRead = t >= n * DT;
+    rows.push({ text: '— EOF —', color: C.muted, alpha: eofRead && t >= (n + 1) * DT ? 0.35 : 1, now: eofRead && t < (n + 1) * DT });
+    const cur = Math.min(rows.length - 1, Math.max(0, Math.floor(t / DT)));
+    const offset = Math.max(0, Math.min(rows.length - LIST.rows, cur - 3));
+    drawList(ctx, src.x, y, LIST.wIn, 'INPUT · rdf read people.trig', `${Math.min(n, Math.max(0, Math.floor(t / DT) + 1))} of ${n} read`, rows, offset);
+    arrow(src.x + src.w / 2, y + LIST_H, py - RB - 30);
+  }
+  const arrived = lane.lines.filter((l) => l.t <= t);
+  let n = 0;
+  const rows = arrived.map((l) => {
+    const alpha = Math.min(1, (t - l.t) / 0.3 + 0.2);
+    if (l.kind === 'quad') return { n: ++n, text: quadText(l.payload), color: C.fg, pill: l.payload.g ? l.payload.g.v : 'default', pillColor: graphColor(l.payload.g), alpha };
+    if (l.kind === 'row') return { n: ++n, text: JSON.stringify(l.payload), color: C.row, alpha };
+    if (l.kind === 'text') return { n: ++n, text: l.payload, color: C.text, alpha };
+    return { text: `— EOF · exit code ${lane.exit} —`, color: lane.exit ? C.bad : C.muted, alpha };
+  });
+  const done = arrived.some((l) => l.kind === 'eof');
+  const x = out.x + out.w - LIST.wOut, y = outTop(lane);
+  drawList(ctx, x, y, LIST.wOut, 'STDOUT', `${n} line${n === 1 ? '' : 's'}${done ? ` · exit ${lane.exit}` : ''}`, rows, Math.max(0, rows.length - LIST.rows));
+  arrow(out.x + out.w / 2, py + RB + 4, y);
+}
+
+function drawLane (ctx, lane, t, showInput) {
+  const py = lane.py, P = lane.pieces;
+  const font = (px, w = 400) => { ctx.font = `${w} ${px}px ${MONO}`; };
+  const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); };
+  const studs = (x, w, top, fill) => { for (let sx = x + 12; sx + 12 < x + w - 6; sx += 24) { rr(sx, top - 4, 12, 5, [2, 2, 0, 0]); ctx.fillStyle = hexA(fill, 0.55); ctx.fill(); } };
+  const shape = (x, y, type, fill, r = 4.5) => {
+    ctx.beginPath();
+    if (type === 'nq') ctx.arc(x, y, r, 0, Math.PI * 2);
+    else if (type === 'jsonl') ctx.rect(x - r, y - r, r * 2, r * 2);
+    else { ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x - r, y + r); ctx.closePath(); }
+    ctx.fillStyle = fill; ctx.fill();
+  };
+  // rails, studs, sink tanks, filter chutes
+  P.forEach((pc) => {
+    const fill = pieceFill(pc.kind);
+    if (pc.kind !== 'sink') studs(pc.x, pc.w, py - RB, fill);
+    ctx.save(); ctx.shadowColor = fill; ctx.shadowBlur = pc.kind === 'src' || pc.kind === 'out' ? 0 : 8;
+    rr(pc.x, py - RB, pc.w, RB * 2, 6); ctx.fillStyle = C.panel; ctx.fill(); ctx.restore();
+    ctx.fillStyle = hexA(fill, 0.2); ctx.fill(); ctx.strokeStyle = hexA(fill, 0.85); ctx.lineWidth = 1.4; ctx.stroke();
+    if (pc.kind === 'filter') {
+      ctx.fillStyle = C.bg; ctx.fillRect(pc.px - 9, py, 18, 64);
+      ctx.fillStyle = hexA(fill, 0.85); ctx.fillRect(pc.px - 10.5, py + RB, 1.4, 49); ctx.fillRect(pc.px + 9.1, py + RB, 1.4, 49);
+    }
+    if (pc.kind === 'sink') {
+      const top = py - 154, w = W.sink - 16, x0 = pc.px - w / 2; // the tank keeps its size when the piece is widened
+      ctx.fillStyle = hexA(fill, 0.85); ctx.fillRect(pc.px - 10.5, py - 28, 1.4, 14); ctx.fillRect(pc.px + 9.1, py - 28, 1.4, 14);
+      ctx.fillStyle = C.bg; ctx.fillRect(pc.px - 9, py - 28, 18, 16);
+      studs(x0, w, top, fill);
+      rr(x0, top, w, 128, 8); ctx.fillStyle = hexA(C.bg, 0.82); ctx.fill(); ctx.lineWidth = 1.4; ctx.strokeStyle = hexA(fill, 0.85); ctx.stroke();
+      ctx.font = `400 9.5px ${MONO}`; ctx.fillStyle = C.muted; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    }
+  });
+  // channel and stream-type marks at the joints
+  const c0 = P[0].w - 40, c1 = P[P.length - 1].x + 40;
+  ctx.fillStyle = C.bg; ctx.fillRect(c0, py - CH, c1 - c0, CH * 2);
+  ctx.fillStyle = hexA(C.fg, 0.06); ctx.fillRect(c0, py - CH, c1 - c0, 1); ctx.fillRect(c0, py + CH - 1, c1 - c0, 1);
+  for (let i = 0; i < P.length - 1; i++) shape(P[i + 1].x - GAP / 2, py + RB + 9, P[i].out, typeColor(P[i].out));
+  // labels above the rail, counters below
+  P.forEach((pc) => {
+    const cx = pc.x + pc.w / 2, labelY = pc.kind === 'sink' ? py - 164 : py - RB - 12;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    if (pc.kind === 'src' || pc.kind === 'out') {
+      font(12, 600); ctx.fillStyle = C.fg; ctx.fillText(pc.kind === 'src' ? 'rdf read' : 'stdout', cx, labelY);
+      return;
+    }
+    const kindName = (pc.kind === 'sink' ? 'SINK' : pc.kind.toUpperCase()) + (pc.def.name ? ' · ' + pc.def.name : '');
+    const l1Y = twoLine(pc) ? labelY - 14 : labelY;
+    font(12, 600); const kw = ctx.measureText(kindName + ' ').width;
+    font(10.5); const aw = ctx.measureText(pc.def.args[0]).width;
+    const lx = cx - (kw + aw) / 2;
+    ctx.textAlign = 'left'; font(12, 600); ctx.fillStyle = pieceFill(pc.kind); ctx.fillText(kindName, lx, l1Y);
+    font(10.5); ctx.fillStyle = C.muted; ctx.fillText(pc.def.args[0], lx + kw, l1Y);
+    if (twoLine(pc)) { ctx.textAlign = 'center'; ctx.fillText(pc.def.args[1], cx, labelY); }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    if (pc.kind === 'filter') {
+      const nd = pc.drops.filter((d) => d <= t).length;
+      font(10.5); ctx.fillStyle = nd ? C.fg : C.muted; ctx.fillText(`dropped ${nd}`, pc.px, py + 70);
+    } else if (pc.kind === 'map') {
+      ctx.fillStyle = pieceFill('map'); ctx.fillRect(cx - 2, py - RB + 2, 4, 4); ctx.fillRect(cx - 2, py + RB - 6, 4, 4);
+    } else {
+      const held = pc.fills.filter((f) => f <= t).length;
+      const msg = t >= pc.R + pc.outN * pc.step ? `wrote ${pc.outN} · exit ${pc.exitCode}` : t >= pc.R ? `writing ${pc.outN}` : t >= pc.eofIn ? (pc.links.length ? `EOF in · ${pc.links.length} match` : 'EOF in · running') : held ? `holding ${held} · waits for EOF` : 'waits for EOF';
+      font(10.5, 600); ctx.fillStyle = C.fg; ctx.fillText(msg, cx, py + RB + 5);
+    }
+  });
+  // tokens
+  const drawTok = (k) => {
+    const p = posOf(k, t); if (!p) return;
+    let state = k.states[0]; for (const s of k.states) if (s.t <= t) state = s;
+    const col = tokColor(k.kind, state.payload);
+    const label = tokLabel(k.kind, state.payload);
+    ctx.save();
+    if (p.mode === 'fall') ctx.globalAlpha = p.after !== undefined ? Math.max(0, 1 - p.after / 0.7) : 1;
+    if (p.mode === 'chip' && p.f > 0.6) { // parked in a sink
+      font(9); const lbl = label.length > 12 ? label.slice(0, 11) + '…' : label;
+      rr(p.x - 34, p.y - 9, 68, 18, 5); ctx.fillStyle = C.panel; ctx.fill(); ctx.fillStyle = hexA(col, 0.1); ctx.fill(); ctx.strokeStyle = hexA(col, 0.8); ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(lbl, p.x, p.y + 0.5);
+      ctx.restore(); return;
+    }
+    font(10, k.kind === 'eof' ? 700 : 400);
+    const w = Math.max(36, ctx.measureText(label).width + 12), h = 16;
+    rr(p.x - w / 2, p.y - h / 2, w, h, k.kind === 'quad' ? 8 : 3);
+    ctx.fillStyle = C.panel; ctx.fill(); ctx.fillStyle = hexA(col, 0.1); ctx.fill();
+    ctx.lineWidth = 1.1; ctx.strokeStyle = col; ctx.stroke();
+    if (hasBlank(k.kind, state.payload)) { ctx.save(); ctx.setLineDash([3, 2]); ctx.strokeStyle = C.bn; ctx.lineWidth = 1.5; rr(p.x - w / 2 - 3, p.y - h / 2 - 3, w + 6, h + 6, 10); ctx.stroke(); ctx.restore(); }
+    if (state.flash && t - state.t < 0.5) { ctx.save(); ctx.globalAlpha = 1 - (t - state.t) / 0.5; ctx.shadowColor = col; ctx.shadowBlur = 14; ctx.lineWidth = 3; rr(p.x - w / 2, p.y - h / 2, w, h, 8); ctx.stroke(); ctx.restore(); }
+    ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, p.x, p.y + 0.5);
+    ctx.restore();
+  };
+  lane.toks.forEach((k) => { const p = posOf(k, t); if (p && p.mode !== 'pipe') drawTok(k); });
+  // the join inside a sink: the matching quads get a frame and a bracket
+  P.forEach((pc) => {
+    if (!pc.links || !pc.links.length || t < pc.eofIn + 0.35 || t >= pc.R) return;
+    ctx.strokeStyle = C.fg; ctx.lineWidth = 1.5;
+    pc.links.forEach(([a, b]) => {
+      const A = pc.slots[a], B2 = pc.slots[b];
+      for (const S of [A, B2]) { rr(S.x - 36, S.y - 11, 72, 22, 5); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(A.x, A.y - 11); ctx.lineTo(A.x, A.y - 14); ctx.lineTo(B2.x, B2.y - 14); ctx.lineTo(B2.x, B2.y - 11); ctx.stroke();
+    });
+  });
+  ctx.save(); ctx.beginPath(); ctx.rect(P[0].w - 2, py - 20, P[P.length - 1].x - P[0].w + 28, 40); ctx.clip();
+  lane.toks.forEach((k) => { const p = posOf(k, t); if (p && p.mode === 'pipe') drawTok(k); });
+  ctx.restore();
+  drawEnds(ctx, lane, t, showInput);
+}
+
+// ================================================================ scene: canvas and clock
+function makeScene (cv, ids) {
+  const ctx = cv.getContext('2d');
+  ctx.textRendering = 'optimizeSpeed'; // no ligatures: '!=' must stay '!='
+  const sc = { lanes: [], labels: [], T: 0, end: 1, playing: true, xf: [], SH: 420 };
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const setPlay = (on) => { sc.playing = on; $(ids.play).textContent = on ? 'Pause' : 'Play'; };
+  sc.set = (lanesKeys, labels = []) => {
+    sc.lanes = lanesKeys.map((keys) => buildLane(keys, 250));
+    sc.labels = labels;
+    sc.end = Math.max(...sc.lanes.map((l) => l.end));
+    // stack the lanes; each lane spans from its input list (lane A only) to its stdout list
+    const ext = sc.lanes.map((l, i) => ({ top: i === 0 ? inTop(l) : laneTop(l) - 8, bot: outTop(l) + LIST_H }));
+    const s = Math.min(1.1, (SW - 40) / Math.max(...sc.lanes.map((l) => l.total)));
+    let y = 12;
+    sc.xf = sc.lanes.map((l, i) => { const f = { s, ox: (SW - l.total * s) / 2, oy: y - ext[i].top * s }; y += (ext[i].bot - ext[i].top) * s + 18; return f; });
+    sc.SH = Math.round(y - 6);
+    cv.style.aspectRatio = `${SW} / ${sc.SH}`; sc.size();
+    sc.T = reduce ? sc.end : 0; setPlay(!reduce);
+  };
+  sc.size = () => { const dpr = window.devicePixelRatio || 1; cv.width = Math.round(cv.clientWidth * dpr); cv.height = Math.round(cv.clientWidth * sc.SH / SW * dpr); };
+  sc.draw = () => {
+    const k = cv.width / SW;
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    ctx.fillStyle = C.panel; ctx.fillRect(0, 0, SW, sc.SH);
+    ctx.fillStyle = hexA(C.fg, 0.045); for (let x = 12; x < SW; x += 24) for (let y = 12; y < sc.SH; y += 24) ctx.fillRect(x, y, 1.4, 1.4);
+    sc.lanes.forEach((lane, i) => {
+      const f = sc.xf[i];
+      ctx.save(); ctx.translate(f.ox, f.oy); ctx.scale(f.s, f.s);
+      drawLane(ctx, lane, sc.T, i === 0);
+      if (sc.labels[i]) { ctx.font = `600 12px ${MONO}`; ctx.fillStyle = C.fg; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(sc.labels[i], 0, lane.py + RB + 26); }
+      ctx.restore();
+    });
+  };
+  sc.tick = (dt) => {
+    if (sc.playing) { sc.T += dt * Number($(ids.speed).value); if (sc.T >= sc.end) { sc.T = sc.end; setPlay(false); } }
+    sc.draw();
+  };
+  $(ids.play).addEventListener('click', () => { if (sc.T >= sc.end) sc.T = 0; setPlay(!sc.playing); });
+  $(ids.restart).addEventListener('click', () => { sc.T = 0; setPlay(true); });
+  $(ids.skip).addEventListener('click', () => { sc.T = sc.end; setPlay(false); });
+  return sc;
+}
+
+// ================================================================ examples
+const EXAMPLES = [
+  { tab: 'Filter', title: 'Filter: remove the e-mail addresses', lanes: [['fNoMbox']],
+    bullets: ['A <span class="k-filter">FILTER</span> reads one quad, tests the expression, and passes the quad or drops it. Then it reads the next one.',
+      'The two <code>foaf:mbox</code> quads fall out. 9 of 11 quads reach stdout.',
+      'The filter holds one quad at a time. The first quad is at stdout before the last quad leaves the input.'] },
+  { tab: 'Map if', title: 'Map with a condition: hide the e-mail addresses', lanes: [['mMask']],
+    bullets: ['A <span class="k-map">MAP</span> rewrites quads and passes them on: one quad in, one quad out.',
+      '<code>--where</code> is the condition. Only the two <code>foaf:mbox</code> quads match: their object becomes <code>&lt;mailto:hidden@example.org&gt;</code>. The other quads pass unchanged.',
+      'Compare with example 1: the filter removes the e-mail quads, this map keeps them and changes the address. 11 quads reach stdout.'] },
+  { tab: 'Sink', title: 'Sink: a join must see everything', lanes: [['cKnowsName']],
+    bullets: ['The query joins two quads: <code>alice knows bob</code> and <code>bob name "Bob"</code>. When the first one arrives, the second one is still in the input.',
+      'So a <span class="k-sink">SINK</span> keeps every quad until EOF. Then it runs the query and writes the result: <code>alice knowsName "Bob"</code>. Memory grows with the input.',
+      'CONSTRUCT writes quads, so more pieces can follow.'] },
+  { tab: 'Skolem', title: 'Skolem: a map with memory', lanes: [['skolem']],
+    bullets: ['Alice\'s address is a blank node, <code class="t-bn">_:b0_n3-0</code> (dashed outline). Its label is local: another file or another run can use the same label for a different node.',
+      '<code>rdf skolem</code> replaces each blank node with an IRI. It is a map, one quad at a time, but it remembers what it saw: when the blank node comes back in the next quad, it gets the same IRI. Memory grows with the number of blank nodes, not of quads.',
+      'The IRI contains a random UUID. Two runs give two different IRIs, so the output of skolem is not stable.'] },
+  { tab: 'Rows', title: 'SELECT: the stream leaves RDF', lanes: [['sNames']],
+    bullets: ['<code>select</code> is a sink: a SPARQL pattern can match any quad with any other quad, so it reads the whole input first.',
+      'It writes JSON rows (violet), one object per result, one row per line. The output is a stream again, but of rows, not quads. The connector after it is square.',
+      'Only a piece that reads rows fits after <code>select</code>. A filter there fails on line 1: the shell does not check the format.'] },
+  { tab: 'TriG, Turtle', title: 'Pretty: two text formats, two results', lanes: [['prettyTrig'], ['prettyTtl']], labels: ['A  pretty (TriG) with prefixes', 'B  pretty --format turtle with prefixes'],
+    bullets: ['<code>pretty</code> is a sink: it groups all statements of one subject, so it must see all quads first. The blank node is written inline as <code>[ … ]</code>.',
+      '<code>--prefixes prefixes.json</code> gives the prefixes <code>ex:</code> and <code>foaf:</code>. <code>pretty</code> writes them as <code>@prefix</code> lines and shortens the IRIs: <code>ex:alice</code> in place of <code>&lt;http://example.org/alice&gt;</code>. N-Quads has no prefixes, so the pipe cannot carry them from <code>people.trig</code>.',
+      '<b>A.</b> TriG has graphs: the salaries stay in a <code>&lt;urn:g:hr&gt; { … }</code> block.',
+      '<b>B.</b> Turtle has no graphs. The salaries move next to the other statements of Alice and Bob, and the graph name is lost, with no warning.'] },
+  { tab: 'Canonical', title: 'Canonicalize: one text for the same data', lanes: [['canon']],
+    bullets: ['Line order has no meaning, and blank-node labels change from tool to tool. So two files with the same data can differ as text.',
+      '<code>canonicalize</code> is a sink: it collects all quads, gives the blank node the label <code class="t-bn">_:c14n0</code> (RDFC-1.0), and writes the lines sorted. Watch the order at stdout.',
+      'To compare two files: <code>diff &lt;(rdf read a.trig | rdf canonicalize) &lt;(rdf read b.nq | rdf canonicalize)</code>. No output from diff means the same data.'] },
+  { tab: 'Ask', title: 'ASK: the answer is an exit code', lanes: [['askPay'], ['askPayG']], labels: ['A  ASK without GRAPH', 'B  ASK with GRAPH ?g'],
+    bullets: ['<code>ask</code> is a sink that writes one word, <code>true</code> or <code>false</code>, and sets the exit code: 0 for true, 1 for false. A shell script can branch on it: <code>… | rdf ask \'…\' &amp;&amp; echo yes</code>.',
+      '<b>A.</b> The pattern has no <code>GRAPH</code>, so it reads only the default graph. The salaries are in <span class="gp hr">urn:g:hr</span>: the answer is <code>false</code>, exit code 1.',
+      '<b>B.</b> <code>GRAPH ?g</code> reads the named graphs: <code>true</code>, exit code 0.'] },
+  { tab: 'Order', title: 'Order: the same pieces, swapped', lanes: [['fDefault', 'mPublic'], ['mPublic', 'fDefault']], labels: ['A  filter, then map', 'B  map, then filter'],
+    bullets: ['<b>A.</b> The filter <code>!bound(?g)</code> drops the salaries, because they have a graph. Then the map, without a condition, puts the rest in <span class="gp pub">urn:g:public</span>. Result: 9 public quads, no salaries.',
+      '<b>B.</b> The map runs first. After it, every quad has a graph. So the filter drops all of them. Result: 0 quads, exit code 0, no error.',
+      'Each piece does the same work in A and B. Only the order changes, and the order is the program.'] },
+];
+const exScene = makeScene($('cv-ex'), { play: 'ex-play', restart: 'ex-restart', skip: 'ex-skip', speed: 'ex-speed' });
+let exIx = 0;
+function setExample (i) {
+  exIx = Math.max(0, Math.min(EXAMPLES.length - 1, i));
+  const e = EXAMPLES[exIx];
+  exScene.set(e.lanes, e.labels);
+  $('steps').querySelectorAll('button').forEach((b, j) => b.setAttribute('aria-selected', j === exIx ? 'true' : 'false'));
+  const cli = e.lanes.map((keys, j) => (e.labels ? `# ${esc(e.labels[j].replace(/\s+/, ': '))}\n` : '') + shellText(keys)).join('\n\n');
+  $('narr').innerHTML = `<h3>${exIx + 1}. ${esc(e.title)}</h3><ul>${e.bullets.map((b) => `<li>${b}</li>`).join('')}</ul><div class="cli">${cli}</div>`;
+  $('prev').disabled = exIx === 0; $('next').disabled = exIx === EXAMPLES.length - 1;
+}
+$('steps').innerHTML = EXAMPLES.map((e, i) => `<button role="tab" data-step="${i}"><span class="n">${i + 1}</span>${esc(e.tab)}</button>`).join('');
+$('steps').addEventListener('click', (e) => { const b = e.target.closest('[data-step]'); if (b) setExample(Number(b.dataset.step)); });
+$('prev').addEventListener('click', () => setExample(exIx - 1));
+$('next').addEventListener('click', () => setExample(exIx + 1));
+
+// ================================================================ start
+readColors();
+const resize = () => exScene.size();
+resize();
+window.addEventListener('resize', resize);
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+setExample(0);
+let last = performance.now();
+const loop = (ts) => { const dt = Math.min(0.1, Math.max(0, (ts - last) / 1000)); last = ts; exScene.tick(dt); requestAnimationFrame(loop); };
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -12,6 +12,7 @@ Interactive explainers for RDF tools. Site: https://cristianvasquez.github.io/rd
 | Explainer | Explains |
 |---|---|
 | [claimer-cascade](explainers/claimer-cascade/) | `rdf claim`: SHACL claimers, own vs. borrow (frontier), CONSTRUCT views, pipe-order precedence |
+| [quad-pipes](explainers/quad-pipes/) | RDF as a stream of quads: filter, map and sink pieces, pipe order, outputs of SELECT, pretty, canonicalize, skolem and ASK |
 
 ## Layout
 
