@@ -7,7 +7,7 @@ tags: [repo/temp]
 
 # [rdf-explainers](osg://repo/github.com/cristianvasquez/rdf-explainers)
 
-Interactive explainers for RDF tools. Site: https://cristianvasquez.github.io/rdf-explainers/
+Explainers for RDF tools made by Claude. Site: https://cristianvasquez.github.io/rdf-explainers/
 
 | Explainer | Explains |
 |---|---|
