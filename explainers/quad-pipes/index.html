@@ -69,7 +69,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--b-map); out
 
 header.hero { padding-top: 48px; display: grid; gap: 18px; }
 .lede { font-size: 1.1rem; }
-pre.src { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.55; max-width: 560px; }
+pre.src { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.55; }
 .gp { display: inline-block; font: 500 11px/1 var(--mono); padding: 3px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
 .gp.hr { color: var(--g-hr); border-color: color-mix(in srgb, var(--g-hr) 50%, transparent); }
 .gp.pub { color: var(--g-pub); border-color: color-mix(in srgb, var(--g-pub) 50%, transparent); }
@@ -85,8 +85,10 @@ pre.src { margin: 0; background: var(--panel); border: 1px solid var(--line); bo
 .steps button[aria-selected="true"] .n { background: var(--fg); color: var(--bg); }
 .narr { display: grid; gap: 12px; align-content: start; min-width: 0; }
 .narr ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; max-width: 80ch; }
-.cli { font: 12.5px/1.55 var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; color: var(--muted); }
-.cli b { color: var(--fg); font-weight: 600; }
+.cli { font: 13px/1.7 var(--mono); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; white-space: pre; min-width: 0; color: var(--muted); }
+.cli b { font-weight: 600; }
+.cli .pp { color: var(--fg); font-weight: 700; }
+.cli .a-filter { color: var(--b-filter); } .cli .a-map { color: var(--b-map); } .cli .a-sink { color: var(--b-sink); }
 .stage { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
 .stage canvas { display: block; width: 100%; min-width: 760px; aspect-ratio: 1200 / 420; touch-action: pan-y; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -332,8 +334,11 @@ const CMDS = {
   askPayG: { kind: 'sink', name: 'ask', args: ['{ GRAPH ?g { … } }'], cmd: `rdf ask '${pfxE}ASK { GRAPH ?g { ?s ex:salary ?pay } }'`, in: 'nq', out: 'text',
     fn: (qs) => [String(hasSalary(qs, true))], exit: (qs) => (hasSalary(qs, true) ? 0 : 1) },
 };
-const shellText = (keys) => ['rdf read people.trig', ...keys.map((k) => CMDS[k].cmd)]
-  .map((l) => `<b>${esc(l)}</b>`).join(' | ');
+// as the pipe in claimer-cascade: one piece per line, the arguments in the color of the piece kind
+const shellText = (keys) => ['rdf read people.trig', ...keys.map((k) => {
+  const [, head, rest] = CMDS[k].cmd.match(/^(rdf \S+)\s*(.*)$/);
+  return `  <span class="pp">|</span> ${head}${rest ? ` <b class="a-${CMDS[k].kind}">${esc(rest)}</b>` : ''}`;
+})].join(' \\\n');
 
 const $ = (id) => document.getElementById(id);
 $('trig').innerHTML = TRIG;

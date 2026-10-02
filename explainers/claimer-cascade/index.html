@@ -46,6 +46,7 @@ header.hero { padding-top: 48px; display: grid; gap: 18px; }
 .lede { font-size: 1.1rem; }
 .pipe { font-family: var(--mono); font-size: 13px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; white-space: pre; color: var(--muted); }
 .pipe b { font-weight: 600; }
+.pipe .pp, .narr .cli .pp { color: var(--fg); font-weight: 700; }
 .c-person { color: var(--person); } .c-org { color: var(--org); } .c-place { color: var(--place); } .c-type { color: var(--type); } .c-muted { color: var(--muted); }
 
 .sec-head { display: grid; gap: 10px; }
@@ -128,10 +129,10 @@ footer { color: var(--muted); font-size: 13px; }
   <h1>Claimers take shapes of data off the wire and <span class="p">dr</span><span class="o">a</span><span class="l">w</span> them.</h1>
   <p class="lede">A claimer is one SHACL claim plus one or more CONSTRUCT views. The claim takes the triples its shapes read. The view projects them into new RDF for a viewer. Several claimers run as a Unix pipe, and the pipe order is the precedence.</p>
   <div class="pipe">rdf read data.ttl \
-  | rdf claim <b class="c-person">person.trig</b> \
-  | rdf claim <b class="c-org">organization.trig</b> \
-  | rdf claim <b class="c-place">place.trig</b> \
-  | rdf pretty --format trig</div>
+  <span class="pp">|</span> rdf claim <b class="c-person">person.trig</b> \
+  <span class="pp">|</span> rdf claim <b class="c-org">organization.trig</b> \
+  <span class="pp">|</span> rdf claim <b class="c-place">place.trig</b> \
+  <span class="pp">|</span> rdf pretty --format trig</div>
 </header>
 
 <section class="sec-head" aria-labelledby="ex-h">
@@ -728,7 +729,7 @@ function goStep (i) {
   stepIx = Math.max(0, Math.min(STEPS.length - 1, i));
   const s = STEPS[stepIx];
   [...stepsEl.children].forEach((b, k) => b.setAttribute('aria-selected', String(k === stepIx)));
-  $('narr').innerHTML = `<div class="k">Step ${stepIx + 1} of ${STEPS.length} · ${s.k}</div><h3>${s.title}</h3>${s.html()}<div class="cli">${esc(s.cli())}</div>`;
+  $('narr').innerHTML = `<div class="k">Step ${stepIx + 1} of ${STEPS.length} · ${s.k}</div><h3>${s.title}</h3>${s.html()}<div class="cli">${esc(s.cli()).replace(/(^| )\|(?= )/gm, '$1<span class="pp">|</span>')}</div>`;
   const sw = $('swap'); if (sw) sw.addEventListener('click', () => { evePersonFirst = !evePersonFirst; goStep(stepIx); });
   if ($('order')) renderTry();
   sim.configure(s.cfg());
