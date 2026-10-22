@@ -1,10 +1,10 @@
 ---
 repo-uri: osg://repo/github.com/cristianvasquez/rdf-explainers
 repo-name: rdf-explainers
-repo-group: temp
-tags: [repo/temp]
+repo-group: rdf
+tags: [repo/rdf]
+notes: Published in Github
 ---
-
 # [rdf-explainers](osg://repo/github.com/cristianvasquez/rdf-explainers)
 
 Explainers for RDF tools made by Claude. Site: https://cristianvasquez.github.io/rdf-explainers/
