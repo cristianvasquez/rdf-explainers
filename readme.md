@@ -1,8 +1,6 @@
 ---
 repo-uri: osg://repo/github.com/cristianvasquez/rdf-explainers
-repo-name: rdf-explainers
-repo-group: rdf
-tags: [repo/rdf]
+tags: [repo/mirrors]
 notes: Published in Github
 ---
 # [rdf-explainers](osg://repo/github.com/cristianvasquez/rdf-explainers)
